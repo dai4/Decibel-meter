@@ -429,13 +429,13 @@
         const headroom = threshold - db;
         let emoji, statusLabel;
         if (isAlerting) {
-          emoji = '🔴'; statusLabel = 'Too Loud!';
+          emoji = '🤯'; statusLabel = 'Too Loud!';
         } else if (headroom < 4) {
-          emoji = '😬'; statusLabel = 'Getting Loud';
+          emoji = '😳'; statusLabel = 'Getting Loud';
         } else if (db < ambientDb + 3) {
-          emoji = '😌'; statusLabel = 'Quiet';
+          emoji = '😴'; statusLabel = 'Quiet';
         } else {
-          emoji = '🟢'; statusLabel = 'Normal';
+          emoji = '😊'; statusLabel = 'Normal';
         }
 
         // Override color to red when alerting
