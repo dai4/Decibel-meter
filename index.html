@@ -142,37 +142,12 @@
       transition: color 1s ease;
     }
 
-    #spectrum-bar {
+    #db-chart {
       position: absolute;
       bottom: 0;
       left: 0;
       width: 100%;
-      height: 120px;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-align-items: flex-end;
-      align-items: flex-end;
-      -webkit-justify-content: center;
-      justify-content: center;
-      padding: 0 20px;
-      z-index: 1;
-    }
-
-    .bar {
-      -webkit-flex: 1;
-      flex: 1;
-      max-width: 12px;
-      min-height: 4px;
-      border-radius: 4px 4px 0 0;
-      margin: 0 1px;
-    }
-
-    #db-chart {
-      position: absolute;
-      bottom: 125px;
-      left: 0;
-      width: 100%;
-      height: 120px;
+      height: 40%;
       z-index: 1;
     }
 
@@ -196,7 +171,7 @@
 
     #voices {
       position: absolute;
-      bottom: 252px;
+      bottom: 42%;
       left: 0;
       width: 100%;
       display: -webkit-flex;
@@ -256,7 +231,6 @@
     <div id="label">Waiting...</div>
     <div id="peak-db"></div>
     <div id="voices"></div>
-    <div id="spectrum-bar"></div>
     <canvas id="db-chart"></canvas>
   </div>
 
@@ -274,7 +248,6 @@
       { min: 90,  max: 100, color: [255, 50, 0],      label: 'Dangerous' },
       { min: 100, max: 130, color: [200, 0, 0],       label: 'Extreme!' }
     ];
-    var NUM_BARS = 40;
     var SPIKE_MARGIN = 24;
     var MIN_THRESHOLD = 55;
     var CALIBRATION = 120;
@@ -282,7 +255,6 @@
     var AMBIENT_STEADY = 0.01;
 
     var labelEl = document.getElementById('label');
-    var spectrumBar = document.getElementById('spectrum-bar');
     var bgGlow = document.getElementById('bg-glow');
     var spectrumRing = document.getElementById('spectrum-ring');
     var peakDbEl = document.getElementById('peak-db');
@@ -294,15 +266,6 @@
     var peakDecayTimer = null;
     var currentEmoji = '🔇';
     var activeLayer = 'a';
-
-    // Create frequency bars
-    var i, bar;
-    for (i = 0; i < NUM_BARS; i++) {
-      bar = document.createElement('div');
-      bar.className = 'bar';
-      spectrumBar.appendChild(bar);
-    }
-    var bars = spectrumBar.getElementsByClassName('bar');
 
     // ── Helpers ──
     function getColorForDb(db) {
@@ -575,18 +538,6 @@
             'inset 0 0 ' + (20 + intensity * 30) + 'px ' + rgbStr(color, 0.05 + intensity * 0.1);
           spectrumRing.style.border = '2px solid ' + rgbStr(color, 0.3 + intensity * 0.3);
           bgGlow.style.background = 'radial-gradient(ellipse at center, ' + rgbStr(color, 0.05 + intensity * 0.08) + ' 0%, transparent 70%)';
-        }
-
-        // Bars update at reduced rate (~10fps)
-        if (frameCount % 6 === 0) {
-          var value, barHeight, barColor;
-          for (var i = 0; i < NUM_BARS; i++) {
-            value = (freqBars[i] || 0) / 255;
-            barHeight = Math.max(4, value * 100);
-            barColor = getColorForDb(value * 100).color;
-            bars[i].style.height = barHeight + 'px';
-            bars[i].style.background = rgbStr(barColor, 0.6 + value * 0.4);
-          }
         }
 
         // ── dB line chart ──
