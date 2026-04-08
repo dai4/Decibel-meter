@@ -581,7 +581,8 @@
     }
 
     // ── Mode 1: Local mic ──
-    document.getElementById('start-btn').onclick = function() {
+    var startBtn = document.getElementById('start-btn');
+    function startLocalMic() {
       getMic(function(stream) {
         showScreen('visualizer');
         var sample = createAudioProcessor(stream);
@@ -595,7 +596,9 @@
       }, function(err) {
         alert('Microphone access is required.\n\n' + err.message);
       });
-    };
+    }
+    startBtn.onclick = startLocalMic;
+    startBtn.ontouchend = function(e) { e.preventDefault(); startLocalMic(); };
 
     // ── Shared: hover countdown for TV buttons ──
     function setupHover(btn, textEl, label, onTrigger) {
