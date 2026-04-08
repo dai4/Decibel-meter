@@ -89,6 +89,8 @@
       -webkit-justify-content: center;
       justify-content: center;
       position: relative;
+      -webkit-transition: transform 0.8s ease, box-shadow 1.2s ease, border-color 1.2s ease;
+      transition: transform 0.8s ease, box-shadow 1.2s ease, border-color 1.2s ease;
     }
 
     #db-display {
@@ -136,6 +138,8 @@
       letter-spacing: 0.05em;
       text-transform: uppercase;
       z-index: 2;
+      -webkit-transition: color 1s ease;
+      transition: color 1s ease;
     }
 
     #spectrum-bar {
@@ -183,6 +187,8 @@
       width: 100%; height: 100%;
       pointer-events: none;
       z-index: 0;
+      -webkit-transition: background 1.5s ease;
+      transition: background 1.5s ease;
     }
 
     #visualizer > * { z-index: 1; }
@@ -440,6 +446,10 @@
       var smoothDb = 0;
       var displayDb = 0;
 
+      // Smooth color blending
+      var smoothColor = [0, 180, 120]; // start green
+      var COLOR_BLEND = 0.06; // how fast color transitions (~1-2s)
+
       // Percentile-based ambient
       var ambientBuf = [];
       var ambientDb = -1;
@@ -518,17 +528,23 @@
         if (stateHoldFrames > 0) stateHoldFrames--;
 
         // Map state to display
-        var emoji, statusLabel, color;
+        var emoji, statusLabel, targetColor;
         if (lastState === 'shriek') {
           emoji = '🙉'; statusLabel = 'High Pitched!';
-          color = [255, 30, 0];
+          targetColor = [255, 30, 0];
         } else if (lastState === 'loud') {
           emoji = '😳'; statusLabel = 'Loud';
-          color = [255, 180, 0];
+          targetColor = [255, 180, 0];
         } else {
           emoji = '😌'; statusLabel = 'All Good';
-          color = [0, 180, 120];
+          targetColor = [0, 180, 120];
         }
+
+        // Blend color smoothly towards target
+        smoothColor[0] += (targetColor[0] - smoothColor[0]) * COLOR_BLEND;
+        smoothColor[1] += (targetColor[1] - smoothColor[1]) * COLOR_BLEND;
+        smoothColor[2] += (targetColor[2] - smoothColor[2]) * COLOR_BLEND;
+        var color = [Math.round(smoothColor[0]), Math.round(smoothColor[1]), Math.round(smoothColor[2])];
 
         // Only update DOM every 15 frames (~4fps) unless state changes
         var stateChanged = (emoji !== currentEmoji);
