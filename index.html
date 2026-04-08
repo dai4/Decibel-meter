@@ -433,58 +433,43 @@
 
     // ── Visualizer renderer ──
     var voicesEl = document.getElementById('voices');
-    var AMBIENT_BUF_SIZE = 300; // ~5 seconds at 60fps
-    var AMBIENT_MAX = 65;       // hard cap: ambient never exceeds this
+    var AMBIENT_BUF_SIZE = 300;
+    var AMBIENT_MAX = 65;
 
     function createRenderer() {
       var smoothDb = 0;
       var displayDb = 0;
-      var isAlerting = false;
 
-      // Percentile-based ambient: tracks the quiet floor, not the average
+      // Percentile-based ambient
       var ambientBuf = [];
       var ambientDb = -1;
 
-      // Voice tracking: 3 pitch ranges
-      var voiceData = [
-        { label: 'Low', icon: '🗣️', totalDb: 0, count: 0, recentDb: 0, lastSeen: 0 },
-        { label: 'Mid', icon: '👩', totalDb: 0, count: 0, recentDb: 0, lastSeen: 0 },
-        { label: 'High', icon: '👶', totalDb: 0, count: 0, recentDb: 0, lastSeen: 0 }
-      ];
+      // Shriek detection state
+      var shriekCount = 0;
+      var shriekCooldown = 0; // frames to wait before counting another
+      var lastState = 'calm';
+      var stateHoldFrames = 0; // hold current state for stability
       var frameCount = 0;
+      var lastDisplayUpdate = 0;
 
       return function render(rawDb, freqBars, pitch) {
         frameCount++;
 
-        // Fast attack / slow release
+        // Slow smoothing — we don't need fast updates
         if (rawDb > smoothDb) {
-          smoothDb += (rawDb - smoothDb) * 0.6;
+          smoothDb += (rawDb - smoothDb) * 0.3;
         } else {
-          smoothDb += (rawDb - smoothDb) * 0.04;
+          smoothDb += (rawDb - smoothDb) * 0.02;
         }
         var db = smoothDb;
 
-        // Display smoothing
-        if (rawDb > displayDb + 5) {
-          displayDb += (rawDb - displayDb) * 0.35;
-        } else {
-          displayDb += (db - displayDb) * 0.08;
-        }
+        // Very slow display number — only drifts gently
+        displayDb += (db - displayDb) * 0.03;
         var dbRounded = Math.round(displayDb);
 
-        // Peak tracking
-        if (dbRounded > peakDb) {
-          peakDb = dbRounded;
-          clearTimeout(peakDecayTimer);
-          peakDecayTimer = setTimeout(function() { peakDb = 0; }, 3000);
-        }
-
-        // Percentile-based ambient: use 15th percentile of recent readings
-        // This tracks the quiet floor between speech, not the speaking level
+        // Percentile-based ambient
         ambientBuf.push(rawDb);
-        if (ambientBuf.length > AMBIENT_BUF_SIZE) {
-          ambientBuf.shift();
-        }
+        if (ambientBuf.length > AMBIENT_BUF_SIZE) ambientBuf.shift();
         if (ambientBuf.length >= 30) {
           var sorted = ambientBuf.slice().sort(function(a, b) { return a - b; });
           ambientDb = Math.min(sorted[Math.floor(sorted.length * 0.15)], AMBIENT_MAX);
@@ -493,91 +478,98 @@
         }
 
         var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
-        isAlerting = rawDb > threshold;
 
-        // Voice tracking: when sound is above ambient, log the pitch range
-        if (pitch && pitch >= 1 && pitch <= 3 && rawDb > ambientDb + 5) {
-          var v = voiceData[pitch - 1];
-          v.totalDb += rawDb;
-          v.count++;
-          v.recentDb = v.recentDb * 0.9 + rawDb * 0.1; // smooth recent
-          v.lastSeen = frameCount;
+        // Detect HIGH PITCH + LOUD = shriek
+        var isShriek = (pitch === 3) && (rawDb > threshold);
+        if (shriekCooldown > 0) shriekCooldown--;
+
+        if (isShriek && shriekCooldown === 0) {
+          shriekCount++;
+          shriekCooldown = 120; // ~2 seconds before counting again
         }
 
-        // Emoji + label
-        var headroom = threshold - db;
-        var emoji, statusLabel;
-        if (isAlerting) {
-          emoji = '🤯'; statusLabel = 'Too Loud!';
-        } else if (headroom < 4) {
-          emoji = '😳'; statusLabel = 'Getting Loud';
-        } else if (db < ambientDb + 3) {
-          emoji = '😴'; statusLabel = 'Quiet';
+        // Determine state with hold timer for stability
+        var newState;
+        if (isShriek || (lastState === 'shriek' && stateHoldFrames > 0)) {
+          newState = 'shriek';
+        } else if (rawDb > threshold) {
+          newState = 'loud';
         } else {
-          emoji = '😊'; statusLabel = 'Normal';
+          newState = 'calm';
         }
 
-        // Color
-        var color;
-        if (isAlerting) {
-          color = [255, 30, 0];
-        } else {
-          color = getColorForDb(db).color;
-        }
-
-        peakDbEl.textContent = Math.round(ambientDb) + ' dB ambient \u00B7 Threshold: ' + Math.round(threshold) + ' dB';
-
-        // Emoji crossfade
-        if (emoji !== currentEmoji) {
-          currentEmoji = emoji;
-          if (activeLayer === 'a') {
-            emojiB.textContent = emoji;
-            emojiB.className = 'emoji-layer';
-            emojiA.className = 'emoji-layer hidden';
-            activeLayer = 'b';
+        if (newState !== lastState) {
+          // Hold shriek state for 90 frames (~1.5s) so it doesn't flicker
+          if (lastState === 'shriek' && stateHoldFrames > 0) {
+            newState = 'shriek'; // keep holding
           } else {
-            emojiA.textContent = emoji;
-            emojiA.className = 'emoji-layer';
-            emojiB.className = 'emoji-layer hidden';
-            activeLayer = 'a';
+            lastState = newState;
+            stateHoldFrames = (newState === 'shriek') ? 90 : 0;
           }
         }
-        dbNum.textContent = dbRounded + ' dB';
-        labelEl.textContent = statusLabel;
-        labelEl.style.color = rgbStr(color);
+        if (stateHoldFrames > 0) stateHoldFrames--;
 
-        // Update voice tags (every 10 frames to avoid thrashing)
-        if (frameCount % 10 === 0) {
-          var html = '';
-          for (var vi = 0; vi < voiceData.length; vi++) {
-            var vd = voiceData[vi];
-            if (vd.count > 0) {
-              var avg = Math.round(vd.totalDb / vd.count);
-              var recent = Math.round(vd.recentDb);
-              var active = (frameCount - vd.lastSeen) < 30; // seen in last 0.5s
-              var opacity = active ? '1' : '0.4';
-              html += '<span class="voice-tag" style="opacity:' + opacity + ';border-color:' +
-                (active ? rgbStr(color, 0.5) : 'rgba(255,255,255,0.1)') + '">' +
-                vd.icon + ' ' + vd.label + ': ' + recent + ' dB (avg ' + avg + ')' +
-                '</span>';
+        // Map state to display
+        var emoji, statusLabel, color;
+        if (lastState === 'shriek') {
+          emoji = '🙉'; statusLabel = 'High Pitched!';
+          color = [255, 30, 0];
+        } else if (lastState === 'loud') {
+          emoji = '😳'; statusLabel = 'Loud';
+          color = [255, 180, 0];
+        } else {
+          emoji = '😌'; statusLabel = 'All Good';
+          color = [0, 180, 120];
+        }
+
+        // Only update DOM every 15 frames (~4fps) unless state changes
+        var stateChanged = (emoji !== currentEmoji);
+        var shouldUpdate = stateChanged || (frameCount - lastDisplayUpdate > 15);
+
+        if (shouldUpdate) {
+          lastDisplayUpdate = frameCount;
+
+          if (stateChanged) {
+            currentEmoji = emoji;
+            if (activeLayer === 'a') {
+              emojiB.textContent = emoji;
+              emojiB.className = 'emoji-layer';
+              emojiA.className = 'emoji-layer hidden';
+              activeLayer = 'b';
+            } else {
+              emojiA.textContent = emoji;
+              emojiA.className = 'emoji-layer';
+              emojiB.className = 'emoji-layer hidden';
+              activeLayer = 'a';
             }
           }
-          voicesEl.innerHTML = html;
+
+          dbNum.textContent = dbRounded + ' dB';
+          labelEl.textContent = statusLabel;
+          labelEl.style.color = rgbStr(color);
+          peakDbEl.textContent = Math.round(ambientDb) + ' dB ambient \u00B7 Threshold: ' + Math.round(threshold) + ' dB';
+
+          // Show shriek counter
+          if (shriekCount > 0) {
+            voicesEl.innerHTML = '<span class="voice-tag" style="border-color:' +
+              rgbStr([255, 80, 80], 0.5) + '">' +
+              '\uD83D\uDE31 High-pitch shrieks: ' + shriekCount + '</span>';
+          }
+
+          var intensity = Math.min(db / 100, 1);
+          var ringScale = 1 + intensity * 0.1;
+          spectrumRing.style.webkitTransform = 'scale(' + ringScale + ')';
+          spectrumRing.style.transform = 'scale(' + ringScale + ')';
+          spectrumRing.style.boxShadow =
+            '0 0 ' + (40 + intensity * 60) + 'px ' + rgbStr(color, 0.2 + intensity * 0.2) + ', ' +
+            '0 0 ' + (80 + intensity * 80) + 'px ' + rgbStr(color, 0.05 + intensity * 0.1) + ', ' +
+            'inset 0 0 ' + (20 + intensity * 30) + 'px ' + rgbStr(color, 0.05 + intensity * 0.1);
+          spectrumRing.style.border = '2px solid ' + rgbStr(color, 0.3 + intensity * 0.3);
+          bgGlow.style.background = 'radial-gradient(ellipse at center, ' + rgbStr(color, 0.05 + intensity * 0.08) + ' 0%, transparent 70%)';
         }
 
-        var intensity = Math.min(db / 100, 1);
-        var ringScale = 1 + intensity * 0.15;
-        spectrumRing.style.webkitTransform = 'scale(' + ringScale + ')';
-        spectrumRing.style.transform = 'scale(' + ringScale + ')';
-        spectrumRing.style.boxShadow =
-          '0 0 ' + (40 + intensity * 80) + 'px ' + rgbStr(color, 0.3 + intensity * 0.3) + ', ' +
-          '0 0 ' + (80 + intensity * 120) + 'px ' + rgbStr(color, 0.1 + intensity * 0.2) + ', ' +
-          'inset 0 0 ' + (30 + intensity * 40) + 'px ' + rgbStr(color, 0.1 + intensity * 0.15);
-        spectrumRing.style.border = '2px solid ' + rgbStr(color, 0.4 + intensity * 0.4);
-
-        bgGlow.style.background = 'radial-gradient(ellipse at center, ' + rgbStr(color, 0.08 + intensity * 0.12) + ' 0%, transparent 70%)';
-
-        var value, barHeight, barColor;
+        // Bars update at reduced rate (~10fps)
+        if (frameCount % 6 === 0) {        var value, barHeight, barColor;
         for (var i = 0; i < NUM_BARS; i++) {
           value = (freqBars[i] || 0) / 255;
           barHeight = Math.max(4, value * 100);
