@@ -407,8 +407,6 @@
           clearTimeout(peakDecayTimer);
           peakDecayTimer = setTimeout(() => { peakDb = 0; }, 3000);
         }
-        peakDbEl.textContent = `Peak: ${peakDb} dB · Threshold: ${Math.round(threshold)} dB`;
-
         // Adapt ambient baseline (only absorb when sound is near or below current ambient)
         if (ambientDb < 0) {
           ambientDb = rawDb;
@@ -416,6 +414,8 @@
           ambientDb += (rawDb - ambientDb) * AMBIENT_ADAPT;
         }
         const threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
+
+        peakDbEl.textContent = `Peak: ${peakDb} dB · Threshold: ${Math.round(threshold)} dB`;
 
         // Alert on sounds that spike above the adaptive threshold
         if (rawDb > threshold) playAlert();
