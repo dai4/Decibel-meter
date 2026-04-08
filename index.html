@@ -357,13 +357,7 @@
         var rms = Math.sqrt(sum / bufferLength);
         var rawDb = Math.max(0, Math.min(130, 20 * Math.log10(rms + 0.0001) + 90));
 
-        // Downsample freq to NUM_BARS for visualizer
         var freqBars = [];
-        var idx;
-        for (var j = 0; j < NUM_BARS; j++) {
-          idx = Math.floor((j / NUM_BARS) * bufferLength);
-          freqBars.push(freqArray[idx]);
-        }
 
         // Pitch detection: find dominant frequency in voice range
         var pitch = 0; // 0 = no voice, 1 = low, 2 = mid, 3 = high
