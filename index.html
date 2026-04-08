@@ -253,105 +253,6 @@
       analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
 
-      // Random cartoon sounds when dB exceeds 75
-      let alertReady = true;
-      const cartoonSounds = [
-        // Boing spring
-        function() {
-          const t = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(200, t);
-          osc.frequency.exponentialRampToValueAtTime(800, t + 0.1);
-          osc.frequency.exponentialRampToValueAtTime(300, t + 0.25);
-          osc.frequency.exponentialRampToValueAtTime(600, t + 0.35);
-          gain.gain.setValueAtTime(0.5, t);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-          osc.start(t); osc.stop(t + 0.4);
-        },
-        // Slide whistle up
-        function() {
-          const t = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(300, t);
-          osc.frequency.exponentialRampToValueAtTime(1500, t + 0.3);
-          gain.gain.setValueAtTime(0.45, t);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-          osc.start(t); osc.stop(t + 0.35);
-        },
-        // Pop
-        function() {
-          const t = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(600, t);
-          osc.frequency.exponentialRampToValueAtTime(100, t + 0.08);
-          gain.gain.setValueAtTime(0.6, t);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-          osc.start(t); osc.stop(t + 0.12);
-        },
-        // Honk
-        function() {
-          const t = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(180, t);
-          osc.frequency.setValueAtTime(160, t + 0.15);
-          gain.gain.setValueAtTime(0.35, t);
-          gain.gain.setValueAtTime(0.35, t + 0.15);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-          osc.start(t); osc.stop(t + 0.3);
-        },
-        // Wobble
-        function() {
-          const t = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const lfo = audioCtx.createOscillator();
-          const lfoGain = audioCtx.createGain();
-          const gain = audioCtx.createGain();
-          lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(400, t);
-          lfo.frequency.value = 20;
-          lfoGain.gain.value = 200;
-          gain.gain.setValueAtTime(0.45, t);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-          osc.start(t); lfo.start(t);
-          osc.stop(t + 0.4); lfo.stop(t + 0.4);
-        },
-        // Zap
-        function() {
-          const t = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(1200, t);
-          osc.frequency.exponentialRampToValueAtTime(80, t + 0.2);
-          gain.gain.setValueAtTime(0.4, t);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-          osc.start(t); osc.stop(t + 0.25);
-        },
-      ];
-
-      function playAlert() {
-        if (!alertReady) return;
-        alertReady = false;
-        const sound = cartoonSounds[Math.floor(Math.random() * cartoonSounds.length)];
-        sound();
-        setTimeout(() => { alertReady = true; }, 200);
-      }
-
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       const freqArray = new Uint8Array(bufferLength);
@@ -372,7 +273,7 @@
       const AMBIENT_FAST = 0.15;    // initial calibration rate
       const AMBIENT_STEADY = 0.01;  // ongoing tracking rate
       const CALIBRATION = 120;      // ~2s at 60fps before switching to steady
-      const SPIKE_MARGIN = 12;      // dB above ambient to trigger alert
+      const SPIKE_MARGIN = 18;      // dB above ambient to trigger alert
       const MIN_THRESHOLD = 45;
       let isAlerting = false;
 
@@ -430,7 +331,6 @@
 
         // Determine alert state
         isAlerting = rawDb > threshold;
-        if (isAlerting) playAlert();
 
         // Choose emoji and label based on relationship to threshold
         const headroom = threshold - db;
