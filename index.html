@@ -504,7 +504,7 @@
       tvBtnText.textContent = tvBtnLabel;
     });
 
-    tvBtn.addEventListener('click', () => {
+    function startTvMode() {
       const roomId = generateRoomId();
       const peerId = 'soundspectrum-' + roomId;
 
@@ -545,7 +545,9 @@
       peer.on('error', (err) => {
         document.getElementById('pair-status').textContent = 'Connection error: ' + err.type + '. Refresh to retry.';
       });
-    });
+    }
+
+    tvBtn.addEventListener('click', startTvMode);
 
     // ── Mode 3: Phone Mic (auto-start if ?room= in URL) ──
     async function startMicMode(roomId) {
@@ -612,7 +614,7 @@
     if (roomParam) {
       startMicMode(roomParam);
     } else if (modeParam === 'tv') {
-      tvBtn.click();
+      startTvMode();
     }
   </script>
 </body>
