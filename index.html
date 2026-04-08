@@ -4,12 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sound Spectrum Visualizer</title>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -23,39 +21,53 @@
       overflow: hidden;
     }
 
-    #start-screen {
-      text-align: center;
-    }
+    .screen { display: none; text-align: center; }
+    .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
-    #start-screen h1 {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
-    }
+    #start-screen h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    #start-screen p { color: #999; margin-bottom: 2rem; font-size: 1.1rem; }
 
-    #start-screen p {
-      color: #999;
-      margin-bottom: 2rem;
-      font-size: 1.1rem;
-    }
-
-    #start-btn {
+    .btn {
       background: #fff;
       color: #111;
       border: none;
       padding: 1rem 2.5rem;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       border-radius: 50px;
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
+      margin: 0.5rem;
     }
-
-    #start-btn:hover {
+    .btn:hover {
       transform: scale(1.05);
       box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
     }
+    .btn-secondary {
+      background: transparent;
+      color: #fff;
+      border: 2px solid #555;
+    }
+    .btn-secondary:hover {
+      border-color: #fff;
+    }
 
+    /* Pairing screen */
+    #pair-screen { gap: 1.5rem; }
+    #pair-screen h2 { font-size: 1.5rem; }
+    #pair-screen .subtitle { color: #999; font-size: 1rem; margin-bottom: 0.5rem; }
+    #qr-container { background: #fff; padding: 16px; border-radius: 12px; display: inline-block; }
+    #room-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: #fff; margin-top: 0.5rem; }
+    #pair-status { color: #888; font-size: 0.9rem; margin-top: 0.5rem; }
+
+    /* Mic screen (phone) */
+    #mic-screen { gap: 1rem; }
+    #mic-screen h2 { font-size: 1.5rem; }
+    #mic-status { font-size: 3rem; margin: 1rem 0; }
+    #mic-info { color: #888; font-size: 0.9rem; }
+    #mic-db { font-size: 1.2rem; color: #ccc; }
+
+    /* Visualizer */
     #visualizer {
-      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
@@ -103,7 +115,6 @@
       font-weight: 400;
       opacity: 0.5;
       display: block;
-      margin-top: 0.3rem;
       position: absolute;
       bottom: -1.5rem;
       width: 100%;
@@ -155,18 +166,14 @@
 
     #bg-glow {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       pointer-events: none;
       z-index: 0;
       transition: background 0.3s ease-out;
     }
 
-    #visualizer > * {
-      z-index: 1;
-    }
+    #visualizer > * { z-index: 1; }
 
     #peak-db {
       margin-top: 0.5rem;
@@ -177,13 +184,33 @@
 </head>
 <body>
 
-  <div id="start-screen">
+  <!-- Start Screen -->
+  <div id="start-screen" class="screen active">
     <h1>Sound Spectrum</h1>
     <p>Visualize the colour of sound around you</p>
-    <button id="start-btn">Start Listening</button>
+    <button class="btn" id="start-btn">Start Listening</button>
+    <button class="btn btn-secondary" id="tv-btn">Display on TV</button>
   </div>
 
-  <div id="visualizer">
+  <!-- TV Pairing Screen -->
+  <div id="pair-screen" class="screen">
+    <h2>Display Mode</h2>
+    <p class="subtitle">Scan the QR code with your phone to connect</p>
+    <div id="qr-container"></div>
+    <div id="room-code">----</div>
+    <div id="pair-status">Waiting for phone to connect...</div>
+  </div>
+
+  <!-- Phone Mic Screen -->
+  <div id="mic-screen" class="screen">
+    <h2>Connected to TV</h2>
+    <div id="mic-status">🎙️</div>
+    <div id="mic-db">-- dB</div>
+    <div id="mic-info">Streaming audio to display</div>
+  </div>
+
+  <!-- Visualizer (used for both local and remote) -->
+  <div id="visualizer" class="screen">
     <div id="bg-glow"></div>
     <div id="spectrum-ring">
       <div id="db-display">
@@ -193,7 +220,7 @@
       </div>
     </div>
     <div id="label">Waiting...</div>
-    <div id="peak-db">Peak: -- dB</div>
+    <div id="peak-db"></div>
     <div id="spectrum-bar"></div>
     <div id="scale">
       <span>Quiet</span>
@@ -204,6 +231,7 @@
   </div>
 
   <script>
+    // ── Constants ──
     const SPECTRUM = [
       { min: 0,   max: 20,  color: [30, 30, 80],     label: 'Silent' },
       { min: 20,  max: 35,  color: [75, 0, 130],      label: 'Whisper' },
@@ -215,26 +243,31 @@
       { min: 90,  max: 100, color: [255, 50, 0],      label: 'Dangerous' },
       { min: 100, max: 130, color: [200, 0, 0],       label: 'Extreme!' },
     ];
-
     const NUM_BARS = 40;
+    const SPIKE_MARGIN = 18;
+    const MIN_THRESHOLD = 45;
+    const CALIBRATION = 120;
+    const AMBIENT_FAST = 0.15;
+    const AMBIENT_STEADY = 0.01;
+
+    // ── DOM refs ──
     const startScreen = document.getElementById('start-screen');
+    const pairScreen = document.getElementById('pair-screen');
+    const micScreen = document.getElementById('mic-screen');
     const visualizer = document.getElementById('visualizer');
-    const dbDisplay = document.getElementById('db-display');
     const label = document.getElementById('label');
     const spectrumBar = document.getElementById('spectrum-bar');
     const bgGlow = document.getElementById('bg-glow');
     const spectrumRing = document.getElementById('spectrum-ring');
     const peakDbEl = document.getElementById('peak-db');
-
-    let peakDb = 0;
-    let peakDecayTimer = null;
-
-    // Emoji crossfade state
     const emojiA = document.getElementById('emoji-a');
     const emojiB = document.getElementById('emoji-b');
     const dbNum = document.getElementById('db-num');
+
+    let peakDb = 0;
+    let peakDecayTimer = null;
     let currentEmoji = '🔇';
-    let activeLayer = 'a'; // which layer is currently visible
+    let activeLayer = 'a';
 
     // Create frequency bars
     for (let i = 0; i < NUM_BARS; i++) {
@@ -244,17 +277,15 @@
     }
     const bars = document.querySelectorAll('.bar');
 
+    // ── Helpers ──
     function getColorForDb(db) {
       for (let i = SPECTRUM.length - 1; i >= 0; i--) {
         if (db >= SPECTRUM[i].min) {
           const s = SPECTRUM[i];
           const next = SPECTRUM[i + 1];
           if (!next) return { color: s.color, label: s.label };
-
           const t = Math.min((db - s.min) / (s.max - s.min), 1);
-          const color = s.color.map((c, idx) =>
-            Math.round(c + (next.color[idx] - c) * t)
-          );
+          const color = s.color.map((c, idx) => Math.round(c + (next.color[idx] - c) * t));
           return { color, label: s.label };
         }
       }
@@ -265,18 +296,20 @@
       return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
     }
 
-    document.getElementById('start-btn').addEventListener('click', async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        startScreen.style.display = 'none';
-        visualizer.style.display = 'flex';
-        startVisualizer(stream);
-      } catch (err) {
-        alert('Microphone access is required.\n\n' + err.message);
-      }
-    });
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
 
-    function startVisualizer(stream) {
+    function generateRoomId() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let id = '';
+      for (let i = 0; i < 5; i++) id += chars[Math.floor(Math.random() * chars.length)];
+      return id;
+    }
+
+    // ── Audio processing (returns rawDb + freq bars) ──
+    function createAudioProcessor(stream) {
       const audioCtx = new AudioContext();
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
@@ -288,82 +321,75 @@
       const dataArray = new Uint8Array(bufferLength);
       const freqArray = new Uint8Array(bufferLength);
 
-      // Smoothing: fast attack, slow release (visuals)
-      let smoothDb = 0;
-      const ATTACK = 0.6;
-      const RELEASE = 0.04;
-
-      // Extra-heavy smoothing just for the displayed number
-      let displayDb = 0;
-      const DISPLAY_SMOOTH = 0.08;
-      const DISPLAY_SPIKE = 0.35;
-
-      // Adaptive threshold: continuously track ambient noise
-      let ambientDb = -1;
-      let ambientFrames = 0;
-      const AMBIENT_FAST = 0.15;    // initial calibration rate
-      const AMBIENT_STEADY = 0.01;  // ongoing tracking rate
-      const CALIBRATION = 120;      // ~2s at 60fps before switching to steady
-      const SPIKE_MARGIN = 18;      // dB above ambient to trigger alert
-      const MIN_THRESHOLD = 45;
-      let isAlerting = false;
-
-      function update() {
+      return function sample() {
         analyser.getByteTimeDomainData(dataArray);
         analyser.getByteFrequencyData(freqArray);
 
-        // Calculate RMS for dB
         let sum = 0;
         for (let i = 0; i < bufferLength; i++) {
           const val = (dataArray[i] - 128) / 128;
           sum += val * val;
         }
         const rms = Math.sqrt(sum / bufferLength);
-
-        // Convert to approximate dB (calibrated for typical mic)
         const rawDb = Math.max(0, Math.min(130, 20 * Math.log10(rms + 0.0001) + 90));
 
-        // Apply fast-attack / slow-release envelope
+        // Downsample freq to NUM_BARS values
+        const freqBars = [];
+        for (let i = 0; i < NUM_BARS; i++) {
+          const idx = Math.floor((i / NUM_BARS) * bufferLength);
+          freqBars.push(freqArray[idx]);
+        }
+        return { rawDb, freqBars };
+      };
+    }
+
+    // ── Visualizer renderer (works with any data source) ──
+    function createRenderer() {
+      let smoothDb = 0;
+      let displayDb = 0;
+      let ambientDb = -1;
+      let ambientFrames = 0;
+      let isAlerting = false;
+
+      return function render(rawDb, freqBars) {
+        // Fast attack / slow release
         if (rawDb > smoothDb) {
-          smoothDb += (rawDb - smoothDb) * ATTACK;
+          smoothDb += (rawDb - smoothDb) * 0.6;
         } else {
-          smoothDb += (rawDb - smoothDb) * RELEASE;
+          smoothDb += (rawDb - smoothDb) * 0.04;
         }
         const db = smoothDb;
 
-        // Separate slower smoothing for the number display
+        // Display smoothing
         if (rawDb > displayDb + 5) {
-          displayDb += (rawDb - displayDb) * DISPLAY_SPIKE;
+          displayDb += (rawDb - displayDb) * 0.35;
         } else {
-          displayDb += (db - displayDb) * DISPLAY_SMOOTH;
+          displayDb += (db - displayDb) * 0.08;
         }
         const dbRounded = Math.round(displayDb);
 
-        // Track peak
+        // Peak
         if (dbRounded > peakDb) {
           peakDb = dbRounded;
           clearTimeout(peakDecayTimer);
           peakDecayTimer = setTimeout(() => { peakDb = 0; }, 3000);
         }
-        // Continuously adapt ambient baseline
+
+        // Ambient tracking
         ambientFrames++;
         const adaptRate = ambientFrames < CALIBRATION ? AMBIENT_FAST : AMBIENT_STEADY;
         if (ambientDb < 0) {
           ambientDb = rawDb;
         } else if (rawDb < ambientDb + SPIKE_MARGIN) {
-          // Track both rises and drops in room noise
           ambientDb += (rawDb - ambientDb) * adaptRate;
         } else {
-          // During spikes, still let ambient drift down slowly
-          // so it adjusts if the room gets quieter
           ambientDb += (rawDb - ambientDb) * 0.001;
         }
         const threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
 
-        // Determine alert state
         isAlerting = rawDb > threshold;
 
-        // Choose emoji and label based on relationship to threshold
+        // Emoji + label
         const headroom = threshold - db;
         let emoji, statusLabel;
         if (isAlerting) {
@@ -376,20 +402,17 @@
           emoji = '😊'; statusLabel = 'Normal';
         }
 
-        // Override color to red when alerting
-        let color, dbLabel;
+        // Color (red override when alerting)
+        let color;
         if (isAlerting) {
           color = [255, 30, 0];
-          dbLabel = 'Too Loud!';
         } else {
-          const result = getColorForDb(db);
-          color = result.color;
-          dbLabel = result.label;
+          color = getColorForDb(db).color;
         }
 
         peakDbEl.textContent = `${Math.round(ambientDb)} dB ambient · Threshold: ${Math.round(threshold)} dB`;
 
-        // Update display with crossfade
+        // Emoji crossfade
         if (emoji !== currentEmoji) {
           currentEmoji = emoji;
           if (activeLayer === 'a') {
@@ -424,18 +447,140 @@
 
         // Frequency bars
         for (let i = 0; i < NUM_BARS; i++) {
-          const freqIndex = Math.floor((i / NUM_BARS) * bufferLength);
-          const value = freqArray[freqIndex] / 255;
+          const value = (freqBars[i] || 0) / 255;
           const barHeight = Math.max(4, value * 100);
           const barColor = getColorForDb(value * 100).color;
           bars[i].style.height = `${barHeight}px`;
           bars[i].style.background = rgbStr(barColor, 0.6 + value * 0.4);
         }
+      };
+    }
 
-        requestAnimationFrame(update);
+    // ── Mode 1: Local mic (same device) ──
+    document.getElementById('start-btn').addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        showScreen('visualizer');
+        const sample = createAudioProcessor(stream);
+        const render = createRenderer();
+        function loop() {
+          const { rawDb, freqBars } = sample();
+          render(rawDb, freqBars);
+          requestAnimationFrame(loop);
+        }
+        loop();
+      } catch (err) {
+        alert('Microphone access is required.\n\n' + err.message);
       }
+    });
 
-      update();
+    // ── Mode 2: TV Display (receives data from phone) ──
+    document.getElementById('tv-btn').addEventListener('click', () => {
+      const roomId = generateRoomId();
+      const peerId = 'soundspectrum-' + roomId;
+
+      // Show pairing screen
+      showScreen('pair-screen');
+      document.getElementById('room-code').textContent = roomId;
+
+      // Generate QR code
+      const baseUrl = window.location.href.split('?')[0];
+      const micUrl = baseUrl + '?room=' + roomId;
+      const qr = qrcode(0, 'M');
+      qr.addData(micUrl);
+      qr.make();
+      document.getElementById('qr-container').innerHTML = qr.createSvgTag(6, 0);
+
+      // Create PeerJS peer and wait for connection
+      const peer = new Peer(peerId);
+      const render = createRenderer();
+
+      peer.on('open', () => {
+        document.getElementById('pair-status').textContent = 'Waiting for phone to connect...';
+      });
+
+      peer.on('connection', (conn) => {
+        document.getElementById('pair-status').textContent = 'Phone connected!';
+        setTimeout(() => showScreen('visualizer'), 500);
+
+        conn.on('data', (data) => {
+          render(data.rawDb, data.freqBars);
+        });
+
+        conn.on('close', () => {
+          showScreen('pair-screen');
+          document.getElementById('pair-status').textContent = 'Phone disconnected. Waiting for reconnect...';
+        });
+      });
+
+      peer.on('error', (err) => {
+        document.getElementById('pair-status').textContent = 'Connection error: ' + err.type + '. Refresh to retry.';
+      });
+    });
+
+    // ── Mode 3: Phone Mic (auto-start if ?room= in URL) ──
+    async function startMicMode(roomId) {
+      showScreen('mic-screen');
+      const statusEl = document.getElementById('mic-status');
+      const infoEl = document.getElementById('mic-info');
+      const micDbEl = document.getElementById('mic-db');
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const sample = createAudioProcessor(stream);
+
+        statusEl.textContent = '🔄';
+        infoEl.textContent = 'Connecting to display...';
+
+        const peer = new Peer();
+        peer.on('open', () => {
+          const peerId = 'soundspectrum-' + roomId;
+          const conn = peer.connect(peerId, { reliable: true });
+
+          conn.on('open', () => {
+            statusEl.textContent = '🎙️';
+            infoEl.textContent = 'Streaming audio to display';
+
+            function sendLoop() {
+              const data = sample();
+              conn.send(data);
+              // Show local dB on phone
+              micDbEl.textContent = Math.round(data.rawDb) + ' dB';
+
+              if (data.rawDb > 80) {
+                statusEl.textContent = '🤯';
+              } else if (data.rawDb > 60) {
+                statusEl.textContent = '🎙️';
+              } else {
+                statusEl.textContent = '😴';
+              }
+
+              setTimeout(sendLoop, 50); // ~20fps data rate
+            }
+            sendLoop();
+          });
+
+          conn.on('close', () => {
+            statusEl.textContent = '❌';
+            infoEl.textContent = 'Disconnected from display. Refresh to reconnect.';
+          });
+        });
+
+        peer.on('error', (err) => {
+          statusEl.textContent = '❌';
+          infoEl.textContent = 'Connection failed: ' + err.type + '. Refresh to retry.';
+        });
+      } catch (err) {
+        statusEl.textContent = '❌';
+        infoEl.textContent = 'Microphone access required: ' + err.message;
+      }
+    }
+
+    // ── Auto-detect phone mic mode from URL ──
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) {
+      startMicMode(roomParam);
     }
   </script>
 </body>
