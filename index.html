@@ -201,6 +201,8 @@
     <p>Visualize the colour of sound around you</p>
     <button class="btn" id="start-btn">Start Listening</button>
     <button class="btn btn-secondary" id="tv-btn"><span id="tv-btn-text">Display on TV</span></button>
+    <button class="btn btn-secondary" id="tv-legacy-btn"><span id="tv-legacy-text">Display on TV (Legacy)</span></button>
+    <p style="color:#555;font-size:0.75rem;margin-top:0.5rem;">Legacy mode works on older smart TVs (2014+)</p>
   </div>
 
   <div id="pair-screen" class="screen">
@@ -502,49 +504,183 @@
       });
     };
 
-    // ── Mode 2: TV Display (receives data via ntfy.sh relay) ──
-    var NTFY_BASE = 'https://ntfy.sh/sndspctm-';
-    var tvBtn = document.getElementById('tv-btn');
-    var tvBtnText = document.getElementById('tv-btn-text');
-    var tvBtnLabel = 'Display on TV';
-    var hoverTimer = null;
-    var countdownInterval = null;
+    // ── Shared: hover countdown for TV buttons ──
+    function setupHover(btn, textEl, label, onTrigger) {
+      var timer = null;
+      var interval = null;
+      btn.style.minWidth = btn.offsetWidth + 'px';
+      btn.onmouseenter = function() {
+        var seconds = 5;
+        textEl.textContent = seconds + '...';
+        interval = setInterval(function() {
+          seconds--;
+          if (seconds > 0) textEl.textContent = seconds + '...';
+        }, 1000);
+        timer = setTimeout(function() {
+          clearInterval(interval);
+          onTrigger();
+        }, 5000);
+      };
+      btn.onmouseleave = function() {
+        clearTimeout(timer);
+        clearInterval(interval);
+        textEl.textContent = label;
+      };
+    }
 
-    tvBtn.style.minWidth = tvBtn.offsetWidth + 'px';
-
-    tvBtn.onmouseenter = function() {
-      var seconds = 5;
-      tvBtnText.textContent = seconds + '...';
-      countdownInterval = setInterval(function() {
-        seconds--;
-        if (seconds > 0) {
-          tvBtnText.textContent = seconds + '...';
-        }
-      }, 1000);
-      hoverTimer = setTimeout(function() {
-        clearInterval(countdownInterval);
-        startTvMode();
-      }, 5000);
-    };
-    tvBtn.onmouseleave = function() {
-      clearTimeout(hoverTimer);
-      clearInterval(countdownInterval);
-      tvBtnText.textContent = tvBtnLabel;
-    };
-
-    function startTvMode() {
-      var roomId = generateRoomId();
-      var topic = NTFY_BASE + roomId;
-
+    // ── Shared: show QR + room code on pair screen ──
+    function showPairScreen(roomId, micUrlSuffix) {
       showScreen('pair-screen');
       document.getElementById('room-code').textContent = roomId;
-
       var baseUrl = window.location.href.split('?')[0];
-      var micUrl = baseUrl + '?room=' + roomId;
+      var micUrl = baseUrl + micUrlSuffix;
       var qr = qrcode(0, 'M');
       qr.addData(micUrl);
       qr.make();
       document.getElementById('qr-container').innerHTML = qr.createSvgTag(6, 0);
+    }
+
+    // ── Shared: getUserMedia helper ──
+    function getMic(cb, errCb) {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(cb, errCb);
+      } else {
+        var gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        if (!gum) { errCb(new Error('getUserMedia not supported')); return; }
+        gum.call(navigator, { audio: true }, cb, errCb);
+      }
+    }
+
+    // ── Shared: phone mic UI loop ──
+    function runMicUI(sample, micDbEl, statusEl) {
+      var data = sample();
+      micDbEl.textContent = Math.round(data.rawDb) + ' dB';
+      if (data.rawDb > 80) {
+        statusEl.textContent = '🤯';
+      } else if (data.rawDb > 60) {
+        statusEl.textContent = '🎙️';
+      } else {
+        statusEl.textContent = '😴';
+      }
+      return data;
+    }
+
+    // ================================================================
+    // MODE 2A: Modern TV Display (PeerJS / WebRTC)
+    // ================================================================
+    var tvBtn = document.getElementById('tv-btn');
+    var tvBtnText = document.getElementById('tv-btn-text');
+
+    function startTvModern() {
+      var roomId = generateRoomId();
+      showPairScreen(roomId, '?room=' + roomId + '&transport=peer');
+      document.getElementById('pair-status').textContent = 'Loading PeerJS...';
+
+      // Dynamically load PeerJS only when needed
+      var script = document.createElement('script');
+      script.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+      script.onload = function() {
+        var peerId = 'soundspectrum-' + roomId;
+        var peer = new Peer(peerId);
+        var render = createRenderer();
+
+        peer.on('open', function() {
+          document.getElementById('pair-status').textContent = 'Waiting for phone to connect...';
+        });
+
+        peer.on('connection', function(conn) {
+          document.getElementById('pair-status').textContent = 'Phone connected!';
+          setTimeout(function() { showScreen('visualizer'); }, 500);
+
+          conn.on('data', function(data) {
+            render(data.rawDb, data.freqBars);
+          });
+
+          conn.on('close', function() {
+            showScreen('pair-screen');
+            document.getElementById('pair-status').textContent = 'Phone disconnected. Waiting for reconnect...';
+          });
+        });
+
+        peer.on('error', function(err) {
+          document.getElementById('pair-status').textContent = 'Connection error: ' + err.type + '. Refresh to retry.';
+        });
+      };
+      script.onerror = function() {
+        document.getElementById('pair-status').textContent = 'Failed to load PeerJS. Try Legacy mode.';
+      };
+      document.head.appendChild(script);
+    }
+
+    setupHover(tvBtn, tvBtnText, 'Display on TV', startTvModern);
+    tvBtn.onclick = startTvModern;
+
+    // Phone mic mode for modern (PeerJS)
+    function startMicModern(roomId) {
+      showScreen('mic-screen');
+      var statusEl = document.getElementById('mic-status');
+      var infoEl = document.getElementById('mic-info');
+      var micDbEl = document.getElementById('mic-db');
+
+      getMic(function(stream) {
+        var sample = createAudioProcessor(stream);
+        statusEl.textContent = '🔄';
+        infoEl.textContent = 'Loading PeerJS...';
+
+        var script = document.createElement('script');
+        script.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+        script.onload = function() {
+          infoEl.textContent = 'Connecting to display...';
+          var peer = new Peer();
+          peer.on('open', function() {
+            var peerId = 'soundspectrum-' + roomId;
+            var conn = peer.connect(peerId, { reliable: true });
+
+            conn.on('open', function() {
+              statusEl.textContent = '🎙️';
+              infoEl.textContent = 'Streaming audio to display';
+
+              function sendLoop() {
+                var data = runMicUI(sample, micDbEl, statusEl);
+                conn.send({ rawDb: data.rawDb, freqBars: data.freqBars });
+                setTimeout(sendLoop, 50);
+              }
+              sendLoop();
+            });
+
+            conn.on('close', function() {
+              statusEl.textContent = '❌';
+              infoEl.textContent = 'Disconnected. Refresh to reconnect.';
+            });
+          });
+
+          peer.on('error', function(err) {
+            statusEl.textContent = '❌';
+            infoEl.textContent = 'Connection failed: ' + err.type + '. Refresh to retry.';
+          });
+        };
+        script.onerror = function() {
+          statusEl.textContent = '❌';
+          infoEl.textContent = 'Failed to load PeerJS.';
+        };
+        document.head.appendChild(script);
+      }, function(err) {
+        statusEl.textContent = '❌';
+        infoEl.textContent = 'Microphone access required: ' + err.message;
+      });
+    }
+
+    // ================================================================
+    // MODE 2B: Legacy TV Display (ntfy.sh HTTP relay)
+    // ================================================================
+    var NTFY_BASE = 'https://ntfy.sh/sndspctm-';
+    var tvLegacyBtn = document.getElementById('tv-legacy-btn');
+    var tvLegacyText = document.getElementById('tv-legacy-text');
+
+    function startTvLegacy() {
+      var roomId = generateRoomId();
+      var topic = NTFY_BASE + roomId;
+      showPairScreen(roomId, '?room=' + roomId + '&transport=legacy');
 
       var render = createRenderer();
       var connected = false;
@@ -561,7 +697,6 @@
         } catch (e) {}
       }
 
-      // Try EventSource (SSE) first, fall back to XHR polling
       if (typeof EventSource !== 'undefined') {
         var es = new EventSource(topic + '/sse');
         es.onopen = function() {
@@ -570,13 +705,10 @@
         es.onmessage = function(e) {
           try {
             var outer = JSON.parse(e.data);
-            if (outer.message) {
-              handleMessage(outer.message);
-            }
+            if (outer.message) handleMessage(outer.message);
           } catch (ex) {}
         };
         es.onerror = function() {
-          // If SSE fails, fall back to polling
           es.close();
           startPolling(topic, handleMessage);
         };
@@ -600,9 +732,7 @@
               if (!lines[i]) continue;
               try {
                 msg = JSON.parse(lines[i]);
-                if (msg.message) {
-                  handleMessage(msg.message);
-                }
+                if (msg.message) handleMessage(msg.message);
               } catch (ex) {}
             }
           }
@@ -611,57 +741,38 @@
       }, 800);
     }
 
-    tvBtn.onclick = startTvMode;
+    setupHover(tvLegacyBtn, tvLegacyText, 'Display on TV (Legacy)', startTvLegacy);
+    tvLegacyBtn.onclick = startTvLegacy;
 
-    // ── Mode 3: Phone Mic (sends data via ntfy.sh relay) ──
-    function startMicMode(roomId) {
+    // Phone mic mode for legacy (ntfy.sh)
+    function startMicLegacy(roomId) {
       showScreen('mic-screen');
       var statusEl = document.getElementById('mic-status');
       var infoEl = document.getElementById('mic-info');
       var micDbEl = document.getElementById('mic-db');
       var topic = NTFY_BASE + roomId;
 
-      var getUserMedia = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-        ? function(cb, err) { navigator.mediaDevices.getUserMedia({ audio: true }).then(cb, err); }
-        : function(cb, err) {
-            var gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-            if (!gum) { err(new Error('getUserMedia not supported')); return; }
-            gum.call(navigator, { audio: true }, cb, err);
-          };
-
-      getUserMedia(function(stream) {
+      getMic(function(stream) {
         var sample = createAudioProcessor(stream);
         statusEl.textContent = '🎙️';
         infoEl.textContent = 'Streaming audio to display';
 
         var lastSend = 0;
-        var SEND_INTERVAL = 600; // ~1.6fps to stay within ntfy rate limits
+        var SEND_INTERVAL = 600;
 
         function sendLoop() {
-          var data = sample();
+          var data = runMicUI(sample, micDbEl, statusEl);
           var now = Date.now();
 
-          // Throttled send to ntfy.sh
           if (now - lastSend >= SEND_INTERVAL) {
             lastSend = now;
             var payload = JSON.stringify({ r: Math.round(data.rawDb * 10) / 10, f: data.freqBars });
             var xhr = new XMLHttpRequest();
             xhr.open('POST', topic, true);
             xhr.setRequestHeader('Content-Type', 'application/json');
-            // Tell ntfy not to cache or send push notifications
             xhr.setRequestHeader('X-Cache', 'no');
             xhr.setRequestHeader('X-Firebase', 'no');
             xhr.send(payload);
-          }
-
-          // Update local phone UI
-          micDbEl.textContent = Math.round(data.rawDb) + ' dB';
-          if (data.rawDb > 80) {
-            statusEl.textContent = '🤯';
-          } else if (data.rawDb > 60) {
-            statusEl.textContent = '🎙️';
-          } else {
-            statusEl.textContent = '😴';
           }
 
           setTimeout(sendLoop, 50);
@@ -676,10 +787,16 @@
     // ── Auto-detect mode from URL ──
     var roomParam = getUrlParam('room');
     var modeParam = getUrlParam('mode');
-    if (roomParam) {
-      startMicMode(roomParam);
+    var transportParam = getUrlParam('transport');
+
+    if (roomParam && transportParam === 'legacy') {
+      startMicLegacy(roomParam);
+    } else if (roomParam) {
+      startMicModern(roomParam);
+    } else if (modeParam === 'legacy') {
+      startTvLegacy();
     } else if (modeParam === 'tv') {
-      startTvMode();
+      startTvModern();
     }
   </script>
 </body>
