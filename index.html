@@ -364,6 +364,12 @@
       const DISPLAY_SMOOTH = 0.08;
       const DISPLAY_SPIKE = 0.35;
 
+      // Adaptive threshold: track ambient noise level
+      let ambientDb = -1;           // -1 = not yet calibrated
+      const AMBIENT_ADAPT = 0.005;  // very slow — adapts over seconds
+      const SPIKE_MARGIN = 12;      // dB above ambient to trigger alert
+      const MIN_THRESHOLD = 45;     // never trigger below this
+
       function update() {
         analyser.getByteTimeDomainData(dataArray);
         analyser.getByteFrequencyData(freqArray);
@@ -401,10 +407,18 @@
           clearTimeout(peakDecayTimer);
           peakDecayTimer = setTimeout(() => { peakDb = 0; }, 3000);
         }
-        peakDbEl.textContent = `Peak: ${peakDb} dB`;
+        peakDbEl.textContent = `Peak: ${peakDb} dB · Threshold: ${Math.round(threshold)} dB`;
 
-        // Alert on loud sounds
-        if (rawDb > 75) playAlert();
+        // Adapt ambient baseline (only absorb when sound is near or below current ambient)
+        if (ambientDb < 0) {
+          ambientDb = rawDb;
+        } else if (rawDb < ambientDb + SPIKE_MARGIN) {
+          ambientDb += (rawDb - ambientDb) * AMBIENT_ADAPT;
+        }
+        const threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
+
+        // Alert on sounds that spike above the adaptive threshold
+        if (rawDb > threshold) playAlert();
 
         // Get color
         const { color, label: dbLabel } = getColorForDb(db);
