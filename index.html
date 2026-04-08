@@ -347,7 +347,7 @@
         alertReady = false;
         const sound = cartoonSounds[Math.floor(Math.random() * cartoonSounds.length)];
         sound();
-        setTimeout(() => { alertReady = true; }, 2000);
+        setTimeout(() => { alertReady = true; }, 200);
       }
 
       const bufferLength = analyser.frequencyBinCount;
