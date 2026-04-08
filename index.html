@@ -569,8 +569,8 @@
           }
 
           dbNum.textContent = dbRounded + ' dB';
-          labelEl.textContent = statusLabel;
-          labelEl.style.color = rgbStr(color);
+          labelEl.textContent = '';
+
           peakDbEl.textContent = Math.round(ambientDb) + ' dB ambient \u00B7 Threshold: ' + Math.round(threshold) + ' dB';
 
           // Show shriek counter
