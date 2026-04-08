@@ -255,10 +255,15 @@
       const dataArray = new Uint8Array(bufferLength);
       const freqArray = new Uint8Array(bufferLength);
 
-      // Smoothing: fast attack, slow release
+      // Smoothing: fast attack, slow release (visuals)
       let smoothDb = 0;
-      const ATTACK = 0.6;   // jump up quickly on spikes
-      const RELEASE = 0.04; // decay slowly after spikes
+      const ATTACK = 0.6;
+      const RELEASE = 0.04;
+
+      // Extra-heavy smoothing just for the displayed number
+      let displayDb = 0;
+      const DISPLAY_SMOOTH = 0.08;
+      const DISPLAY_SPIKE = 0.35;
 
       function update() {
         analyser.getByteTimeDomainData(dataArray);
@@ -282,7 +287,14 @@
           smoothDb += (rawDb - smoothDb) * RELEASE;
         }
         const db = smoothDb;
-        const dbRounded = Math.round(db);
+
+        // Separate slower smoothing for the number display
+        if (rawDb > displayDb + 5) {
+          displayDb += (rawDb - displayDb) * DISPLAY_SPIKE;
+        } else {
+          displayDb += (db - displayDb) * DISPLAY_SMOOTH;
+        }
+        const dbRounded = Math.round(displayDb);
 
         // Track peak
         if (dbRounded > peakDb) {
