@@ -255,6 +255,11 @@
       const dataArray = new Uint8Array(bufferLength);
       const freqArray = new Uint8Array(bufferLength);
 
+      // Smoothing: fast attack, slow release
+      let smoothDb = 0;
+      const ATTACK = 0.6;   // jump up quickly on spikes
+      const RELEASE = 0.04; // decay slowly after spikes
+
       function update() {
         analyser.getByteTimeDomainData(dataArray);
         analyser.getByteFrequencyData(freqArray);
@@ -268,7 +273,15 @@
         const rms = Math.sqrt(sum / bufferLength);
 
         // Convert to approximate dB (calibrated for typical mic)
-        const db = Math.max(0, Math.min(130, 20 * Math.log10(rms + 0.0001) + 90));
+        const rawDb = Math.max(0, Math.min(130, 20 * Math.log10(rms + 0.0001) + 90));
+
+        // Apply fast-attack / slow-release envelope
+        if (rawDb > smoothDb) {
+          smoothDb += (rawDb - smoothDb) * ATTACK;
+        } else {
+          smoothDb += (rawDb - smoothDb) * RELEASE;
+        }
+        const db = smoothDb;
         const dbRounded = Math.round(db);
 
         // Track peak
