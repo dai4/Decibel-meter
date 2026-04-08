@@ -534,10 +534,11 @@
           targetColor = [0, 180, 120];
         }
 
-        // Blend color smoothly towards target
-        smoothColor[0] += (targetColor[0] - smoothColor[0]) * COLOR_BLEND;
-        smoothColor[1] += (targetColor[1] - smoothColor[1]) * COLOR_BLEND;
-        smoothColor[2] += (targetColor[2] - smoothColor[2]) * COLOR_BLEND;
+        // Blend color smoothly towards target (fast attack for shriek, slow release)
+        var blend = (lastState === 'shriek') ? 0.3 : COLOR_BLEND;
+        smoothColor[0] += (targetColor[0] - smoothColor[0]) * blend;
+        smoothColor[1] += (targetColor[1] - smoothColor[1]) * blend;
+        smoothColor[2] += (targetColor[2] - smoothColor[2]) * blend;
         var color = [Math.round(smoothColor[0]), Math.round(smoothColor[1]), Math.round(smoothColor[2])];
 
         // Only update DOM every 15 frames (~4fps) unless state changes
