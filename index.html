@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sound Spectrum Visualizer</title>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -503,7 +502,8 @@
       });
     };
 
-    // ── Mode 2: TV Display ──
+    // ── Mode 2: TV Display (receives data via ntfy.sh relay) ──
+    var NTFY_BASE = 'https://ntfy.sh/sndspctm-';
     var tvBtn = document.getElementById('tv-btn');
     var tvBtnText = document.getElementById('tv-btn-text');
     var tvBtnLabel = 'Display on TV';
@@ -534,7 +534,7 @@
 
     function startTvMode() {
       var roomId = generateRoomId();
-      var peerId = 'soundspectrum-' + roomId;
+      var topic = NTFY_BASE + roomId;
 
       showScreen('pair-screen');
       document.getElementById('room-code').textContent = roomId;
@@ -546,40 +546,80 @@
       qr.make();
       document.getElementById('qr-container').innerHTML = qr.createSvgTag(6, 0);
 
-      var peer = new Peer(peerId);
       var render = createRenderer();
+      var connected = false;
 
-      peer.on('open', function() {
-        document.getElementById('pair-status').textContent = 'Waiting for phone to connect...';
-      });
+      function handleMessage(msg) {
+        try {
+          var data = JSON.parse(msg);
+          if (!connected) {
+            connected = true;
+            document.getElementById('pair-status').textContent = 'Phone connected!';
+            setTimeout(function() { showScreen('visualizer'); }, 500);
+          }
+          render(data.r, data.f);
+        } catch (e) {}
+      }
 
-      peer.on('connection', function(conn) {
-        document.getElementById('pair-status').textContent = 'Phone connected!';
-        setTimeout(function() { showScreen('visualizer'); }, 500);
+      // Try EventSource (SSE) first, fall back to XHR polling
+      if (typeof EventSource !== 'undefined') {
+        var es = new EventSource(topic + '/sse');
+        es.onopen = function() {
+          document.getElementById('pair-status').textContent = 'Waiting for phone to connect...';
+        };
+        es.onmessage = function(e) {
+          try {
+            var outer = JSON.parse(e.data);
+            if (outer.message) {
+              handleMessage(outer.message);
+            }
+          } catch (ex) {}
+        };
+        es.onerror = function() {
+          // If SSE fails, fall back to polling
+          es.close();
+          startPolling(topic, handleMessage);
+        };
+      } else {
+        startPolling(topic, handleMessage);
+      }
+    }
 
-        conn.on('data', function(data) {
-          render(data.rawDb, data.freqBars);
-        });
-
-        conn.on('close', function() {
-          showScreen('pair-screen');
-          document.getElementById('pair-status').textContent = 'Phone disconnected. Waiting for reconnect...';
-        });
-      });
-
-      peer.on('error', function(err) {
-        document.getElementById('pair-status').textContent = 'Connection error: ' + err.type + '. Refresh to retry.';
-      });
+    function startPolling(topic, handleMessage) {
+      document.getElementById('pair-status').textContent = 'Waiting for phone to connect...';
+      var since = 'all';
+      setInterval(function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', topic + '/json?poll=1&since=' + since, true);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            since = '2s';
+            var lines = xhr.responseText.trim().split('\n');
+            var i, msg;
+            for (i = 0; i < lines.length; i++) {
+              if (!lines[i]) continue;
+              try {
+                msg = JSON.parse(lines[i]);
+                if (msg.message) {
+                  handleMessage(msg.message);
+                }
+              } catch (ex) {}
+            }
+          }
+        };
+        xhr.send();
+      }, 800);
     }
 
     tvBtn.onclick = startTvMode;
 
-    // ── Mode 3: Phone Mic ──
+    // ── Mode 3: Phone Mic (sends data via ntfy.sh relay) ──
     function startMicMode(roomId) {
       showScreen('mic-screen');
       var statusEl = document.getElementById('mic-status');
       var infoEl = document.getElementById('mic-info');
       var micDbEl = document.getElementById('mic-db');
+      var topic = NTFY_BASE + roomId;
 
       var getUserMedia = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
         ? function(cb, err) { navigator.mediaDevices.getUserMedia({ audio: true }).then(cb, err); }
@@ -591,47 +631,42 @@
 
       getUserMedia(function(stream) {
         var sample = createAudioProcessor(stream);
+        statusEl.textContent = '🎙️';
+        infoEl.textContent = 'Streaming audio to display';
 
-        statusEl.textContent = '🔄';
-        infoEl.textContent = 'Connecting to display...';
+        var lastSend = 0;
+        var SEND_INTERVAL = 600; // ~1.6fps to stay within ntfy rate limits
 
-        var peer = new Peer();
-        peer.on('open', function() {
-          var peerId = 'soundspectrum-' + roomId;
-          var conn = peer.connect(peerId, { reliable: true });
+        function sendLoop() {
+          var data = sample();
+          var now = Date.now();
 
-          conn.on('open', function() {
+          // Throttled send to ntfy.sh
+          if (now - lastSend >= SEND_INTERVAL) {
+            lastSend = now;
+            var payload = JSON.stringify({ r: Math.round(data.rawDb * 10) / 10, f: data.freqBars });
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', topic, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            // Tell ntfy not to cache or send push notifications
+            xhr.setRequestHeader('X-Cache', 'no');
+            xhr.setRequestHeader('X-Firebase', 'no');
+            xhr.send(payload);
+          }
+
+          // Update local phone UI
+          micDbEl.textContent = Math.round(data.rawDb) + ' dB';
+          if (data.rawDb > 80) {
+            statusEl.textContent = '🤯';
+          } else if (data.rawDb > 60) {
             statusEl.textContent = '🎙️';
-            infoEl.textContent = 'Streaming audio to display';
+          } else {
+            statusEl.textContent = '😴';
+          }
 
-            function sendLoop() {
-              var data = sample();
-              conn.send(data);
-              micDbEl.textContent = Math.round(data.rawDb) + ' dB';
-
-              if (data.rawDb > 80) {
-                statusEl.textContent = '🤯';
-              } else if (data.rawDb > 60) {
-                statusEl.textContent = '🎙️';
-              } else {
-                statusEl.textContent = '😴';
-              }
-
-              setTimeout(sendLoop, 50);
-            }
-            sendLoop();
-          });
-
-          conn.on('close', function() {
-            statusEl.textContent = '❌';
-            infoEl.textContent = 'Disconnected from display. Refresh to reconnect.';
-          });
-        });
-
-        peer.on('error', function(err) {
-          statusEl.textContent = '❌';
-          infoEl.textContent = 'Connection failed: ' + err.type + '. Refresh to retry.';
-        });
+          setTimeout(sendLoop, 50);
+        }
+        sendLoop();
       }, function(err) {
         statusEl.textContent = '❌';
         infoEl.textContent = 'Microphone access required: ' + err.message;
