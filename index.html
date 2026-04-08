@@ -192,6 +192,29 @@
       font-size: 0.9rem;
       color: #888;
     }
+
+    #voices {
+      position: absolute;
+      bottom: 140px;
+      left: 0;
+      width: 100%;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-justify-content: center;
+      justify-content: center;
+      padding: 0 20px;
+      z-index: 2;
+    }
+
+    .voice-tag {
+      padding: 4px 12px;
+      margin: 0 4px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -231,6 +254,7 @@
     </div>
     <div id="label">Waiting...</div>
     <div id="peak-db"></div>
+    <div id="voices"></div>
     <div id="spectrum-bar"></div>
     <div id="scale">
       <span>Quiet</span>
@@ -342,20 +366,29 @@
     function createAudioProcessor(stream) {
       var AudioCtx = window.AudioContext || window.webkitAudioContext;
       var audioCtx = new AudioCtx();
+      var sampleRate = audioCtx.sampleRate || 44100;
       var source = audioCtx.createMediaStreamSource(stream);
       var analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
+      analyser.fftSize = 2048; // high res for pitch detection
       analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
 
-      var bufferLength = analyser.frequencyBinCount;
+      var bufferLength = analyser.frequencyBinCount; // 1024 bins
       var dataArray = new Uint8Array(bufferLength);
       var freqArray = new Uint8Array(bufferLength);
+      var hzPerBin = sampleRate / analyser.fftSize;
+
+      // Voice pitch ranges in bins
+      var voiceLowMin = Math.floor(80 / hzPerBin);   // ~80Hz
+      var voiceLowMax = Math.floor(165 / hzPerBin);   // ~165Hz (low/male)
+      var voiceMidMax = Math.floor(260 / hzPerBin);   // ~260Hz (mid/female)
+      var voiceHighMax = Math.floor(400 / hzPerBin);  // ~400Hz (high/child)
 
       return function sample() {
         analyser.getByteTimeDomainData(dataArray);
         analyser.getByteFrequencyData(freqArray);
 
+        // RMS for dB
         var sum = 0;
         var val;
         for (var i = 0; i < bufferLength; i++) {
@@ -365,25 +398,65 @@
         var rms = Math.sqrt(sum / bufferLength);
         var rawDb = Math.max(0, Math.min(130, 20 * Math.log10(rms + 0.0001) + 90));
 
+        // Downsample freq to NUM_BARS for visualizer
         var freqBars = [];
         var idx;
         for (var j = 0; j < NUM_BARS; j++) {
           idx = Math.floor((j / NUM_BARS) * bufferLength);
           freqBars.push(freqArray[idx]);
         }
-        return { rawDb: rawDb, freqBars: freqBars };
+
+        // Pitch detection: find dominant frequency in voice range
+        var pitch = 0; // 0 = no voice, 1 = low, 2 = mid, 3 = high
+        var peakVal = 0;
+        var peakBin = 0;
+        for (var k = voiceLowMin; k < voiceHighMax && k < bufferLength; k++) {
+          if (freqArray[k] > peakVal) {
+            peakVal = freqArray[k];
+            peakBin = k;
+          }
+        }
+        // Only classify if there's meaningful energy in voice range
+        if (peakVal > 100) {
+          if (peakBin < voiceLowMax) {
+            pitch = 1; // low voice
+          } else if (peakBin < voiceMidMax) {
+            pitch = 2; // mid voice
+          } else {
+            pitch = 3; // high voice
+          }
+        }
+
+        return { rawDb: rawDb, freqBars: freqBars, pitch: pitch };
       };
     }
 
     // ── Visualizer renderer ──
+    var voicesEl = document.getElementById('voices');
+    var AMBIENT_BUF_SIZE = 300; // ~5 seconds at 60fps
+    var AMBIENT_MAX = 65;       // hard cap: ambient never exceeds this
+
     function createRenderer() {
       var smoothDb = 0;
       var displayDb = 0;
-      var ambientDb = -1;
-      var ambientFrames = 0;
       var isAlerting = false;
 
-      return function render(rawDb, freqBars) {
+      // Percentile-based ambient: tracks the quiet floor, not the average
+      var ambientBuf = [];
+      var ambientDb = -1;
+
+      // Voice tracking: 3 pitch ranges
+      var voiceData = [
+        { label: 'Low', icon: '🗣️', totalDb: 0, count: 0, recentDb: 0, lastSeen: 0 },
+        { label: 'Mid', icon: '👩', totalDb: 0, count: 0, recentDb: 0, lastSeen: 0 },
+        { label: 'High', icon: '👶', totalDb: 0, count: 0, recentDb: 0, lastSeen: 0 }
+      ];
+      var frameCount = 0;
+
+      return function render(rawDb, freqBars, pitch) {
+        frameCount++;
+
+        // Fast attack / slow release
         if (rawDb > smoothDb) {
           smoothDb += (rawDb - smoothDb) * 0.6;
         } else {
@@ -391,6 +464,7 @@
         }
         var db = smoothDb;
 
+        // Display smoothing
         if (rawDb > displayDb + 5) {
           displayDb += (rawDb - displayDb) * 0.35;
         } else {
@@ -398,25 +472,39 @@
         }
         var dbRounded = Math.round(displayDb);
 
+        // Peak tracking
         if (dbRounded > peakDb) {
           peakDb = dbRounded;
           clearTimeout(peakDecayTimer);
           peakDecayTimer = setTimeout(function() { peakDb = 0; }, 3000);
         }
 
-        ambientFrames++;
-        var adaptRate = ambientFrames < CALIBRATION ? AMBIENT_FAST : AMBIENT_STEADY;
-        if (ambientDb < 0) {
-          ambientDb = rawDb;
-        } else if (rawDb < ambientDb + SPIKE_MARGIN) {
-          ambientDb += (rawDb - ambientDb) * adaptRate;
-        } else {
-          ambientDb += (rawDb - ambientDb) * 0.001;
+        // Percentile-based ambient: use 15th percentile of recent readings
+        // This tracks the quiet floor between speech, not the speaking level
+        ambientBuf.push(rawDb);
+        if (ambientBuf.length > AMBIENT_BUF_SIZE) {
+          ambientBuf.shift();
         }
-        var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
+        if (ambientBuf.length >= 30) {
+          var sorted = ambientBuf.slice().sort(function(a, b) { return a - b; });
+          ambientDb = Math.min(sorted[Math.floor(sorted.length * 0.15)], AMBIENT_MAX);
+        } else if (ambientDb < 0) {
+          ambientDb = rawDb;
+        }
 
+        var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
         isAlerting = rawDb > threshold;
 
+        // Voice tracking: when sound is above ambient, log the pitch range
+        if (pitch && pitch >= 1 && pitch <= 3 && rawDb > ambientDb + 5) {
+          var v = voiceData[pitch - 1];
+          v.totalDb += rawDb;
+          v.count++;
+          v.recentDb = v.recentDb * 0.9 + rawDb * 0.1; // smooth recent
+          v.lastSeen = frameCount;
+        }
+
+        // Emoji + label
         var headroom = threshold - db;
         var emoji, statusLabel;
         if (isAlerting) {
@@ -429,6 +517,7 @@
           emoji = '😊'; statusLabel = 'Normal';
         }
 
+        // Color
         var color;
         if (isAlerting) {
           color = [255, 30, 0];
@@ -438,6 +527,7 @@
 
         peakDbEl.textContent = Math.round(ambientDb) + ' dB ambient \u00B7 Threshold: ' + Math.round(threshold) + ' dB';
 
+        // Emoji crossfade
         if (emoji !== currentEmoji) {
           currentEmoji = emoji;
           if (activeLayer === 'a') {
@@ -455,6 +545,25 @@
         dbNum.textContent = dbRounded + ' dB';
         labelEl.textContent = statusLabel;
         labelEl.style.color = rgbStr(color);
+
+        // Update voice tags (every 10 frames to avoid thrashing)
+        if (frameCount % 10 === 0) {
+          var html = '';
+          for (var vi = 0; vi < voiceData.length; vi++) {
+            var vd = voiceData[vi];
+            if (vd.count > 0) {
+              var avg = Math.round(vd.totalDb / vd.count);
+              var recent = Math.round(vd.recentDb);
+              var active = (frameCount - vd.lastSeen) < 30; // seen in last 0.5s
+              var opacity = active ? '1' : '0.4';
+              html += '<span class="voice-tag" style="opacity:' + opacity + ';border-color:' +
+                (active ? rgbStr(color, 0.5) : 'rgba(255,255,255,0.1)') + '">' +
+                vd.icon + ' ' + vd.label + ': ' + recent + ' dB (avg ' + avg + ')' +
+                '</span>';
+            }
+          }
+          voicesEl.innerHTML = html;
+        }
 
         var intensity = Math.min(db / 100, 1);
         var ringScale = 1 + intensity * 0.15;
@@ -481,21 +590,13 @@
 
     // ── Mode 1: Local mic ──
     document.getElementById('start-btn').onclick = function() {
-      var getUserMedia = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-        ? function(cb, err) { navigator.mediaDevices.getUserMedia({ audio: true }).then(cb, err); }
-        : function(cb, err) {
-            var gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-            if (!gum) { err(new Error('getUserMedia not supported')); return; }
-            gum.call(navigator, { audio: true }, cb, err);
-          };
-
-      getUserMedia(function(stream) {
+      getMic(function(stream) {
         showScreen('visualizer');
         var sample = createAudioProcessor(stream);
         var render = createRenderer();
         function loop() {
           var data = sample();
-          render(data.rawDb, data.freqBars);
+          render(data.rawDb, data.freqBars, data.pitch);
           requestAnimationFrame(loop);
         }
         loop();
@@ -593,7 +694,7 @@
           setTimeout(function() { showScreen('visualizer'); }, 500);
 
           conn.on('data', function(data) {
-            render(data.rawDb, data.freqBars);
+            render(data.rawDb, data.freqBars, data.pitch || 0);
           });
 
           conn.on('close', function() {
@@ -642,7 +743,7 @@
 
               function sendLoop() {
                 var data = runMicUI(sample, micDbEl, statusEl);
-                conn.send({ rawDb: data.rawDb, freqBars: data.freqBars });
+                conn.send({ rawDb: data.rawDb, freqBars: data.freqBars, pitch: data.pitch });
                 setTimeout(sendLoop, 50);
               }
               sendLoop();
@@ -693,7 +794,7 @@
             document.getElementById('pair-status').textContent = 'Phone connected!';
             setTimeout(function() { showScreen('visualizer'); }, 500);
           }
-          render(data.r, data.f);
+          render(data.r, data.f, data.p || 0);
         } catch (e) {}
       }
 
@@ -766,7 +867,7 @@
 
           if (now - lastSend >= SEND_INTERVAL) {
             lastSend = now;
-            var payload = JSON.stringify({ r: Math.round(data.rawDb * 10) / 10, f: data.freqBars });
+            var payload = JSON.stringify({ r: Math.round(data.rawDb * 10) / 10, f: data.freqBars, p: data.pitch });
             var xhr = new XMLHttpRequest();
             xhr.open('POST', topic, true);
             xhr.setRequestHeader('Content-Type', 'application/json');
