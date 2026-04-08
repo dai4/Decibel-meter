@@ -76,16 +76,18 @@
     }
 
     #db-display {
-      font-size: 4rem;
-      font-weight: 700;
+      font-size: 5rem;
       text-align: center;
       z-index: 2;
+      line-height: 1.1;
     }
 
-    #db-display span {
-      font-size: 1.5rem;
+    #db-display .db-num {
+      font-size: 1.2rem;
       font-weight: 400;
-      opacity: 0.7;
+      opacity: 0.5;
+      display: block;
+      margin-top: 0.3rem;
     }
 
     #label {
@@ -164,7 +166,7 @@
   <div id="visualizer">
     <div id="bg-glow"></div>
     <div id="spectrum-ring">
-      <div id="db-display">-- <span>dB</span></div>
+      <div id="db-display">🔇<span class="db-num">-- dB</span></div>
     </div>
     <div id="label">Waiting...</div>
     <div id="peak-db">Peak: -- dB</div>
@@ -366,9 +368,10 @@
 
       // Adaptive threshold: track ambient noise level
       let ambientDb = -1;           // -1 = not yet calibrated
-      const AMBIENT_ADAPT = 0.005;  // very slow — adapts over seconds
+      let ambientSamples = 0;       // count frames for learning curve
       const SPIKE_MARGIN = 12;      // dB above ambient to trigger alert
       const MIN_THRESHOLD = 45;     // never trigger below this
+      let isAlerting = false;       // true when over threshold
 
       function update() {
         analyser.getByteTimeDomainData(dataArray);
@@ -407,25 +410,50 @@
           clearTimeout(peakDecayTimer);
           peakDecayTimer = setTimeout(() => { peakDb = 0; }, 3000);
         }
-        // Adapt ambient baseline (only absorb when sound is near or below current ambient)
+        // Adapt ambient baseline with learning curve:
+        // Fast at first (learns room in ~2s), then slows to track drift
+        ambientSamples++;
+        const adaptRate = Math.max(0.003, 0.3 / Math.sqrt(ambientSamples));
         if (ambientDb < 0) {
           ambientDb = rawDb;
         } else if (rawDb < ambientDb + SPIKE_MARGIN) {
-          ambientDb += (rawDb - ambientDb) * AMBIENT_ADAPT;
+          ambientDb += (rawDb - ambientDb) * adaptRate;
         }
         const threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
 
-        peakDbEl.textContent = `Peak: ${peakDb} dB · Threshold: ${Math.round(threshold)} dB`;
+        // Determine alert state
+        isAlerting = rawDb > threshold;
+        if (isAlerting) playAlert();
 
-        // Alert on sounds that spike above the adaptive threshold
-        if (rawDb > threshold) playAlert();
+        // Choose emoji and label based on relationship to threshold
+        const headroom = threshold - db;
+        let emoji, statusLabel;
+        if (isAlerting) {
+          emoji = '🔴'; statusLabel = 'Too Loud!';
+        } else if (headroom < 4) {
+          emoji = '😬'; statusLabel = 'Getting Loud';
+        } else if (db < ambientDb + 3) {
+          emoji = '😌'; statusLabel = 'Quiet';
+        } else {
+          emoji = '🟢'; statusLabel = 'Normal';
+        }
 
-        // Get color
-        const { color, label: dbLabel } = getColorForDb(db);
+        // Override color to red when alerting
+        let color, dbLabel;
+        if (isAlerting) {
+          color = [255, 30, 0];
+          dbLabel = 'Too Loud!';
+        } else {
+          const result = getColorForDb(db);
+          color = result.color;
+          dbLabel = result.label;
+        }
+
+        peakDbEl.textContent = `${Math.round(ambientDb)} dB ambient · Threshold: ${Math.round(threshold)} dB`;
 
         // Update display
-        dbDisplay.innerHTML = `${dbRounded} <span>dB</span>`;
-        label.textContent = dbLabel;
+        dbDisplay.innerHTML = `${emoji}<span class="db-num">${dbRounded} dB</span>`;
+        label.textContent = statusLabel;
         label.style.color = rgbStr(color);
 
         // Ring glow
