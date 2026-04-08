@@ -279,8 +279,8 @@
       { min: 100, max: 130, color: [200, 0, 0],       label: 'Extreme!' }
     ];
     var NUM_BARS = 40;
-    var SPIKE_MARGIN = 18;
-    var MIN_THRESHOLD = 45;
+    var SPIKE_MARGIN = 24;
+    var MIN_THRESHOLD = 55;
     var CALIBRATION = 120;
     var AMBIENT_FAST = 0.15;
     var AMBIENT_STEADY = 0.01;
@@ -446,9 +446,11 @@
 
       // Shriek detection state
       var shriekCount = 0;
-      var shriekCooldown = 0; // frames to wait before counting another
+      var shriekCooldown = 0;
+      var shriekFrames = 0;   // consecutive frames of high-pitch + loud
+      var SHRIEK_CONFIRM = 5; // need 5 consecutive frames to confirm shriek
       var lastState = 'calm';
-      var stateHoldFrames = 0; // hold current state for stability
+      var stateHoldFrames = 0;
       var frameCount = 0;
       var lastDisplayUpdate = 0;
 
@@ -479,13 +481,19 @@
 
         var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
 
-        // Detect HIGH PITCH + LOUD = shriek
-        var isShriek = (pitch === 3) && (rawDb > threshold);
+        // Detect HIGH PITCH + LOUD = shriek (must sustain for 5+ frames)
+        var isHighAndLoud = (pitch === 3) && (rawDb > threshold + 5);
+        if (isHighAndLoud) {
+          shriekFrames++;
+        } else {
+          shriekFrames = Math.max(0, shriekFrames - 2); // decay slowly
+        }
+        var isShriek = shriekFrames >= SHRIEK_CONFIRM;
         if (shriekCooldown > 0) shriekCooldown--;
 
         if (isShriek && shriekCooldown === 0) {
           shriekCount++;
-          shriekCooldown = 120; // ~2 seconds before counting again
+          shriekCooldown = 180; // ~3 seconds before counting again
         }
 
         // Determine state with hold timer for stability
