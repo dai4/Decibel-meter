@@ -569,13 +569,15 @@
         }
 
         // Bars update at reduced rate (~10fps)
-        if (frameCount % 6 === 0) {        var value, barHeight, barColor;
-        for (var i = 0; i < NUM_BARS; i++) {
-          value = (freqBars[i] || 0) / 255;
-          barHeight = Math.max(4, value * 100);
-          barColor = getColorForDb(value * 100).color;
-          bars[i].style.height = barHeight + 'px';
-          bars[i].style.background = rgbStr(barColor, 0.6 + value * 0.4);
+        if (frameCount % 6 === 0) {
+          var value, barHeight, barColor;
+          for (var i = 0; i < NUM_BARS; i++) {
+            value = (freqBars[i] || 0) / 255;
+            barHeight = Math.max(4, value * 100);
+            barColor = getColorForDb(value * 100).color;
+            bars[i].style.height = barHeight + 'px';
+            bars[i].style.background = rgbStr(barColor, 0.6 + value * 0.4);
+          }
         }
       };
     }
