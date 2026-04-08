@@ -605,11 +605,14 @@
       }
     }
 
-    // ── Auto-detect phone mic mode from URL ──
+    // ── Auto-detect mode from URL ──
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
+    const modeParam = urlParams.get('mode');
     if (roomParam) {
       startMicMode(roomParam);
+    } else if (modeParam === 'tv') {
+      tvBtn.click();
     }
   </script>
 </body>
