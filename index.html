@@ -14,15 +14,28 @@
       background: #111;
       color: #fff;
       min-height: 100vh;
+      display: -webkit-flex;
       display: flex;
+      -webkit-flex-direction: column;
       flex-direction: column;
+      -webkit-align-items: center;
       align-items: center;
+      -webkit-justify-content: center;
       justify-content: center;
       overflow: hidden;
     }
 
     .screen { display: none; text-align: center; }
-    .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .screen.active {
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-align-items: center;
+      align-items: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+    }
 
     #start-screen h1 { font-size: 2rem; margin-bottom: 0.5rem; }
     #start-screen p { color: #999; margin-bottom: 2rem; font-size: 1.1rem; }
@@ -35,41 +48,31 @@
       font-size: 1.1rem;
       border-radius: 50px;
       cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
       margin: 0.5rem;
-    }
-    .btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
     }
     .btn-secondary {
       background: transparent;
       color: #fff;
       border: 2px solid #555;
     }
-    .btn-secondary:hover {
-      border-color: #fff;
-    }
 
-    /* Pairing screen */
-    #pair-screen { gap: 1.5rem; }
-    #pair-screen h2 { font-size: 1.5rem; }
+    #pair-screen h2 { font-size: 1.5rem; margin-bottom: 1rem; }
     #pair-screen .subtitle { color: #999; font-size: 1rem; margin-bottom: 0.5rem; }
-    #qr-container { background: #fff; padding: 16px; border-radius: 12px; display: inline-block; }
+    #qr-container { background: #fff; padding: 16px; border-radius: 12px; display: inline-block; margin: 1rem 0; }
     #room-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.15em; color: #fff; margin-top: 0.5rem; }
     #pair-status { color: #888; font-size: 0.9rem; margin-top: 0.5rem; }
 
-    /* Mic screen (phone) */
-    #mic-screen { gap: 1rem; }
-    #mic-screen h2 { font-size: 1.5rem; }
+    #mic-screen h2 { font-size: 1.5rem; margin-bottom: 1rem; }
     #mic-status { font-size: 3rem; margin: 1rem 0; }
     #mic-info { color: #888; font-size: 0.9rem; }
     #mic-db { font-size: 1.2rem; color: #ccc; }
 
-    /* Visualizer */
     #visualizer {
+      -webkit-flex-direction: column;
       flex-direction: column;
+      -webkit-align-items: center;
       align-items: center;
+      -webkit-justify-content: center;
       justify-content: center;
       width: 100%;
       height: 100vh;
@@ -80,10 +83,12 @@
       width: 320px;
       height: 320px;
       border-radius: 50%;
+      display: -webkit-flex;
       display: flex;
+      -webkit-align-items: center;
       align-items: center;
+      -webkit-justify-content: center;
       justify-content: center;
-      transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
       position: relative;
     }
 
@@ -100,13 +105,17 @@
       position: absolute;
       left: 50%;
       top: 0;
+      -webkit-transform: translateX(-50%);
       transform: translateX(-50%);
+      -webkit-transition: opacity 0.4s ease-in-out, -webkit-transform 0.4s ease-in-out;
       transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
       line-height: 1;
+      opacity: 1;
     }
 
     .emoji-layer.hidden {
       opacity: 0;
+      -webkit-transform: translateX(-50%) scale(0.7);
       transform: translateX(-50%) scale(0.7);
     }
 
@@ -136,20 +145,23 @@
       left: 0;
       width: 100%;
       height: 120px;
+      display: -webkit-flex;
       display: flex;
+      -webkit-align-items: flex-end;
       align-items: flex-end;
+      -webkit-justify-content: center;
       justify-content: center;
-      gap: 3px;
       padding: 0 20px;
       z-index: 1;
     }
 
     .bar {
+      -webkit-flex: 1;
       flex: 1;
       max-width: 12px;
       min-height: 4px;
       border-radius: 4px 4px 0 0;
-      transition: height 0.08s ease-out;
+      margin: 0 1px;
     }
 
     #scale {
@@ -157,7 +169,9 @@
       bottom: 130px;
       left: 0;
       width: 100%;
+      display: -webkit-flex;
       display: flex;
+      -webkit-justify-content: space-between;
       justify-content: space-between;
       padding: 0 20px;
       font-size: 0.7rem;
@@ -170,7 +184,6 @@
       width: 100%; height: 100%;
       pointer-events: none;
       z-index: 0;
-      transition: background 0.3s ease-out;
     }
 
     #visualizer > * { z-index: 1; }
@@ -184,7 +197,6 @@
 </head>
 <body>
 
-  <!-- Start Screen -->
   <div id="start-screen" class="screen active">
     <h1>Sound Spectrum</h1>
     <p>Visualize the colour of sound around you</p>
@@ -192,7 +204,6 @@
     <button class="btn btn-secondary" id="tv-btn"><span id="tv-btn-text">Display on TV</span></button>
   </div>
 
-  <!-- TV Pairing Screen -->
   <div id="pair-screen" class="screen">
     <h2>Display Mode</h2>
     <p class="subtitle">Scan the QR code with your phone to connect</p>
@@ -201,7 +212,6 @@
     <div id="pair-status">Waiting for phone to connect...</div>
   </div>
 
-  <!-- Phone Mic Screen -->
   <div id="mic-screen" class="screen">
     <h2>Connected to TV</h2>
     <div id="mic-status">🎙️</div>
@@ -209,7 +219,6 @@
     <div id="mic-info">Streaming audio to display</div>
   </div>
 
-  <!-- Visualizer (used for both local and remote) -->
   <div id="visualizer" class="screen">
     <div id="bg-glow"></div>
     <div id="spectrum-ring">
@@ -231,8 +240,9 @@
   </div>
 
   <script>
-    // ── Constants ──
-    const SPECTRUM = [
+    // ── ES5-compatible code for old TV browsers ──
+
+    var SPECTRUM = [
       { min: 0,   max: 20,  color: [30, 30, 80],     label: 'Silent' },
       { min: 20,  max: 35,  color: [75, 0, 130],      label: 'Whisper' },
       { min: 35,  max: 50,  color: [0, 80, 200],      label: 'Quiet' },
@@ -241,143 +251,160 @@
       { min: 70,  max: 80,  color: [255, 220, 0],     label: 'Loud' },
       { min: 80,  max: 90,  color: [255, 140, 0],     label: 'Very Loud' },
       { min: 90,  max: 100, color: [255, 50, 0],      label: 'Dangerous' },
-      { min: 100, max: 130, color: [200, 0, 0],       label: 'Extreme!' },
+      { min: 100, max: 130, color: [200, 0, 0],       label: 'Extreme!' }
     ];
-    const NUM_BARS = 40;
-    const SPIKE_MARGIN = 18;
-    const MIN_THRESHOLD = 45;
-    const CALIBRATION = 120;
-    const AMBIENT_FAST = 0.15;
-    const AMBIENT_STEADY = 0.01;
+    var NUM_BARS = 40;
+    var SPIKE_MARGIN = 18;
+    var MIN_THRESHOLD = 45;
+    var CALIBRATION = 120;
+    var AMBIENT_FAST = 0.15;
+    var AMBIENT_STEADY = 0.01;
 
-    // ── DOM refs ──
-    const startScreen = document.getElementById('start-screen');
-    const pairScreen = document.getElementById('pair-screen');
-    const micScreen = document.getElementById('mic-screen');
-    const visualizer = document.getElementById('visualizer');
-    const label = document.getElementById('label');
-    const spectrumBar = document.getElementById('spectrum-bar');
-    const bgGlow = document.getElementById('bg-glow');
-    const spectrumRing = document.getElementById('spectrum-ring');
-    const peakDbEl = document.getElementById('peak-db');
-    const emojiA = document.getElementById('emoji-a');
-    const emojiB = document.getElementById('emoji-b');
-    const dbNum = document.getElementById('db-num');
+    var labelEl = document.getElementById('label');
+    var spectrumBar = document.getElementById('spectrum-bar');
+    var bgGlow = document.getElementById('bg-glow');
+    var spectrumRing = document.getElementById('spectrum-ring');
+    var peakDbEl = document.getElementById('peak-db');
+    var emojiA = document.getElementById('emoji-a');
+    var emojiB = document.getElementById('emoji-b');
+    var dbNum = document.getElementById('db-num');
 
-    let peakDb = 0;
-    let peakDecayTimer = null;
-    let currentEmoji = '🔇';
-    let activeLayer = 'a';
+    var peakDb = 0;
+    var peakDecayTimer = null;
+    var currentEmoji = '🔇';
+    var activeLayer = 'a';
 
     // Create frequency bars
-    for (let i = 0; i < NUM_BARS; i++) {
-      const bar = document.createElement('div');
-      bar.classList.add('bar');
+    var i, bar;
+    for (i = 0; i < NUM_BARS; i++) {
+      bar = document.createElement('div');
+      bar.className = 'bar';
       spectrumBar.appendChild(bar);
     }
-    const bars = document.querySelectorAll('.bar');
+    var bars = spectrumBar.getElementsByClassName('bar');
 
     // ── Helpers ──
     function getColorForDb(db) {
-      for (let i = SPECTRUM.length - 1; i >= 0; i--) {
+      var i, s, next, t, color, idx;
+      for (i = SPECTRUM.length - 1; i >= 0; i--) {
         if (db >= SPECTRUM[i].min) {
-          const s = SPECTRUM[i];
-          const next = SPECTRUM[i + 1];
+          s = SPECTRUM[i];
+          next = SPECTRUM[i + 1];
           if (!next) return { color: s.color, label: s.label };
-          const t = Math.min((db - s.min) / (s.max - s.min), 1);
-          const color = s.color.map((c, idx) => Math.round(c + (next.color[idx] - c) * t));
-          return { color, label: s.label };
+          t = Math.min((db - s.min) / (s.max - s.min), 1);
+          color = [];
+          for (idx = 0; idx < 3; idx++) {
+            color.push(Math.round(s.color[idx] + (next.color[idx] - s.color[idx]) * t));
+          }
+          return { color: color, label: s.label };
         }
       }
       return { color: SPECTRUM[0].color, label: SPECTRUM[0].label };
     }
 
-    function rgbStr(color, alpha = 1) {
-      return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+    function rgbStr(color, alpha) {
+      if (alpha === undefined) alpha = 1;
+      return 'rgba(' + color[0] + ', ' + color[1] + ', ' + color[2] + ', ' + alpha + ')';
     }
 
     function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
+      var screens = document.getElementsByClassName('screen');
+      for (var i = 0; i < screens.length; i++) {
+        screens[i].className = screens[i].className.replace(' active', '').replace('active', '');
+      }
+      var target = document.getElementById(id);
+      target.className = target.className + ' active';
     }
 
     function generateRoomId() {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let id = '';
-      for (let i = 0; i < 5; i++) id += chars[Math.floor(Math.random() * chars.length)];
+      var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      var id = '';
+      for (var i = 0; i < 5; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
       return id;
     }
 
-    // ── Audio processing (returns rawDb + freq bars) ──
+    function getUrlParam(name) {
+      var search = window.location.search.substring(1);
+      var pairs = search.split('&');
+      for (var i = 0; i < pairs.length; i++) {
+        var parts = pairs[i].split('=');
+        if (decodeURIComponent(parts[0]) === name) {
+          return decodeURIComponent(parts[1] || '');
+        }
+      }
+      return null;
+    }
+
+    // ── Audio processing ──
     function createAudioProcessor(stream) {
-      const audioCtx = new AudioContext();
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      var audioCtx = new AudioCtx();
+      var source = audioCtx.createMediaStreamSource(stream);
+      var analyser = audioCtx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
 
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      const freqArray = new Uint8Array(bufferLength);
+      var bufferLength = analyser.frequencyBinCount;
+      var dataArray = new Uint8Array(bufferLength);
+      var freqArray = new Uint8Array(bufferLength);
 
       return function sample() {
         analyser.getByteTimeDomainData(dataArray);
         analyser.getByteFrequencyData(freqArray);
 
-        let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          const val = (dataArray[i] - 128) / 128;
+        var sum = 0;
+        var val;
+        for (var i = 0; i < bufferLength; i++) {
+          val = (dataArray[i] - 128) / 128;
           sum += val * val;
         }
-        const rms = Math.sqrt(sum / bufferLength);
-        const rawDb = Math.max(0, Math.min(130, 20 * Math.log10(rms + 0.0001) + 90));
+        var rms = Math.sqrt(sum / bufferLength);
+        var rawDb = Math.max(0, Math.min(130, 20 * Math.log10(rms + 0.0001) + 90));
 
-        // Downsample freq to NUM_BARS values
-        const freqBars = [];
-        for (let i = 0; i < NUM_BARS; i++) {
-          const idx = Math.floor((i / NUM_BARS) * bufferLength);
+        var freqBars = [];
+        var idx;
+        for (var j = 0; j < NUM_BARS; j++) {
+          idx = Math.floor((j / NUM_BARS) * bufferLength);
           freqBars.push(freqArray[idx]);
         }
-        return { rawDb, freqBars };
+        return { rawDb: rawDb, freqBars: freqBars };
       };
     }
 
-    // ── Visualizer renderer (works with any data source) ──
+    // ── Visualizer renderer ──
     function createRenderer() {
-      let smoothDb = 0;
-      let displayDb = 0;
-      let ambientDb = -1;
-      let ambientFrames = 0;
-      let isAlerting = false;
+      var smoothDb = 0;
+      var displayDb = 0;
+      var ambientDb = -1;
+      var ambientFrames = 0;
+      var isAlerting = false;
 
       return function render(rawDb, freqBars) {
-        // Fast attack / slow release
         if (rawDb > smoothDb) {
           smoothDb += (rawDb - smoothDb) * 0.6;
         } else {
           smoothDb += (rawDb - smoothDb) * 0.04;
         }
-        const db = smoothDb;
+        var db = smoothDb;
 
-        // Display smoothing
         if (rawDb > displayDb + 5) {
           displayDb += (rawDb - displayDb) * 0.35;
         } else {
           displayDb += (db - displayDb) * 0.08;
         }
-        const dbRounded = Math.round(displayDb);
+        var dbRounded = Math.round(displayDb);
 
-        // Peak
         if (dbRounded > peakDb) {
           peakDb = dbRounded;
           clearTimeout(peakDecayTimer);
-          peakDecayTimer = setTimeout(() => { peakDb = 0; }, 3000);
+          peakDecayTimer = setTimeout(function() { peakDb = 0; }, 3000);
         }
 
-        // Ambient tracking
         ambientFrames++;
-        const adaptRate = ambientFrames < CALIBRATION ? AMBIENT_FAST : AMBIENT_STEADY;
+        var adaptRate = ambientFrames < CALIBRATION ? AMBIENT_FAST : AMBIENT_STEADY;
         if (ambientDb < 0) {
           ambientDb = rawDb;
         } else if (rawDb < ambientDb + SPIKE_MARGIN) {
@@ -385,13 +412,12 @@
         } else {
           ambientDb += (rawDb - ambientDb) * 0.001;
         }
-        const threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
+        var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
 
         isAlerting = rawDb > threshold;
 
-        // Emoji + label
-        const headroom = threshold - db;
-        let emoji, statusLabel;
+        var headroom = threshold - db;
+        var emoji, statusLabel;
         if (isAlerting) {
           emoji = '🤯'; statusLabel = 'Too Loud!';
         } else if (headroom < 4) {
@@ -402,180 +428,185 @@
           emoji = '😊'; statusLabel = 'Normal';
         }
 
-        // Color (red override when alerting)
-        let color;
+        var color;
         if (isAlerting) {
           color = [255, 30, 0];
         } else {
           color = getColorForDb(db).color;
         }
 
-        peakDbEl.textContent = `${Math.round(ambientDb)} dB ambient · Threshold: ${Math.round(threshold)} dB`;
+        peakDbEl.textContent = Math.round(ambientDb) + ' dB ambient \u00B7 Threshold: ' + Math.round(threshold) + ' dB';
 
-        // Emoji crossfade
         if (emoji !== currentEmoji) {
           currentEmoji = emoji;
           if (activeLayer === 'a') {
             emojiB.textContent = emoji;
-            emojiB.classList.remove('hidden');
-            emojiA.classList.add('hidden');
+            emojiB.className = 'emoji-layer';
+            emojiA.className = 'emoji-layer hidden';
             activeLayer = 'b';
           } else {
             emojiA.textContent = emoji;
-            emojiA.classList.remove('hidden');
-            emojiB.classList.add('hidden');
+            emojiA.className = 'emoji-layer';
+            emojiB.className = 'emoji-layer hidden';
             activeLayer = 'a';
           }
         }
-        dbNum.textContent = `${dbRounded} dB`;
-        label.textContent = statusLabel;
-        label.style.color = rgbStr(color);
+        dbNum.textContent = dbRounded + ' dB';
+        labelEl.textContent = statusLabel;
+        labelEl.style.color = rgbStr(color);
 
-        // Ring glow
-        const intensity = Math.min(db / 100, 1);
-        const ringScale = 1 + intensity * 0.15;
-        spectrumRing.style.transform = `scale(${ringScale})`;
-        spectrumRing.style.boxShadow = `
-          0 0 ${40 + intensity * 80}px ${rgbStr(color, 0.3 + intensity * 0.3)},
-          0 0 ${80 + intensity * 120}px ${rgbStr(color, 0.1 + intensity * 0.2)},
-          inset 0 0 ${30 + intensity * 40}px ${rgbStr(color, 0.1 + intensity * 0.15)}
-        `;
-        spectrumRing.style.border = `2px solid ${rgbStr(color, 0.4 + intensity * 0.4)}`;
+        var intensity = Math.min(db / 100, 1);
+        var ringScale = 1 + intensity * 0.15;
+        spectrumRing.style.webkitTransform = 'scale(' + ringScale + ')';
+        spectrumRing.style.transform = 'scale(' + ringScale + ')';
+        spectrumRing.style.boxShadow =
+          '0 0 ' + (40 + intensity * 80) + 'px ' + rgbStr(color, 0.3 + intensity * 0.3) + ', ' +
+          '0 0 ' + (80 + intensity * 120) + 'px ' + rgbStr(color, 0.1 + intensity * 0.2) + ', ' +
+          'inset 0 0 ' + (30 + intensity * 40) + 'px ' + rgbStr(color, 0.1 + intensity * 0.15);
+        spectrumRing.style.border = '2px solid ' + rgbStr(color, 0.4 + intensity * 0.4);
 
-        // Background glow
-        bgGlow.style.background = `radial-gradient(ellipse at center, ${rgbStr(color, 0.08 + intensity * 0.12)} 0%, transparent 70%)`;
+        bgGlow.style.background = 'radial-gradient(ellipse at center, ' + rgbStr(color, 0.08 + intensity * 0.12) + ' 0%, transparent 70%)';
 
-        // Frequency bars
-        for (let i = 0; i < NUM_BARS; i++) {
-          const value = (freqBars[i] || 0) / 255;
-          const barHeight = Math.max(4, value * 100);
-          const barColor = getColorForDb(value * 100).color;
-          bars[i].style.height = `${barHeight}px`;
+        var value, barHeight, barColor;
+        for (var i = 0; i < NUM_BARS; i++) {
+          value = (freqBars[i] || 0) / 255;
+          barHeight = Math.max(4, value * 100);
+          barColor = getColorForDb(value * 100).color;
+          bars[i].style.height = barHeight + 'px';
           bars[i].style.background = rgbStr(barColor, 0.6 + value * 0.4);
         }
       };
     }
 
-    // ── Mode 1: Local mic (same device) ──
-    document.getElementById('start-btn').addEventListener('click', async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // ── Mode 1: Local mic ──
+    document.getElementById('start-btn').onclick = function() {
+      var getUserMedia = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+        ? function(cb, err) { navigator.mediaDevices.getUserMedia({ audio: true }).then(cb, err); }
+        : function(cb, err) {
+            var gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+            if (!gum) { err(new Error('getUserMedia not supported')); return; }
+            gum.call(navigator, { audio: true }, cb, err);
+          };
+
+      getUserMedia(function(stream) {
         showScreen('visualizer');
-        const sample = createAudioProcessor(stream);
-        const render = createRenderer();
+        var sample = createAudioProcessor(stream);
+        var render = createRenderer();
         function loop() {
-          const { rawDb, freqBars } = sample();
-          render(rawDb, freqBars);
+          var data = sample();
+          render(data.rawDb, data.freqBars);
           requestAnimationFrame(loop);
         }
         loop();
-      } catch (err) {
+      }, function(err) {
         alert('Microphone access is required.\n\n' + err.message);
-      }
-    });
+      });
+    };
 
-    // ── Mode 2: TV Display (receives data from phone) ──
-    const tvBtn = document.getElementById('tv-btn');
-    const tvBtnText = document.getElementById('tv-btn-text');
-    const tvBtnLabel = 'Display on TV';
-    let hoverTimer = null;
-    let countdownInterval = null;
+    // ── Mode 2: TV Display ──
+    var tvBtn = document.getElementById('tv-btn');
+    var tvBtnText = document.getElementById('tv-btn-text');
+    var tvBtnLabel = 'Display on TV';
+    var hoverTimer = null;
+    var countdownInterval = null;
 
-    // Lock button width on first render so countdown text doesn't resize it
     tvBtn.style.minWidth = tvBtn.offsetWidth + 'px';
 
-    tvBtn.addEventListener('mouseenter', () => {
-      let seconds = 5;
-      tvBtnText.textContent = `${seconds}...`;
-      countdownInterval = setInterval(() => {
+    tvBtn.onmouseenter = function() {
+      var seconds = 5;
+      tvBtnText.textContent = seconds + '...';
+      countdownInterval = setInterval(function() {
         seconds--;
         if (seconds > 0) {
-          tvBtnText.textContent = `${seconds}...`;
+          tvBtnText.textContent = seconds + '...';
         }
       }, 1000);
-      hoverTimer = setTimeout(() => {
+      hoverTimer = setTimeout(function() {
         clearInterval(countdownInterval);
-        tvBtn.click();
+        startTvMode();
       }, 5000);
-    });
-    tvBtn.addEventListener('mouseleave', () => {
+    };
+    tvBtn.onmouseleave = function() {
       clearTimeout(hoverTimer);
       clearInterval(countdownInterval);
       tvBtnText.textContent = tvBtnLabel;
-    });
+    };
 
     function startTvMode() {
-      const roomId = generateRoomId();
-      const peerId = 'soundspectrum-' + roomId;
+      var roomId = generateRoomId();
+      var peerId = 'soundspectrum-' + roomId;
 
-      // Show pairing screen
       showScreen('pair-screen');
       document.getElementById('room-code').textContent = roomId;
 
-      // Generate QR code
-      const baseUrl = window.location.href.split('?')[0];
-      const micUrl = baseUrl + '?room=' + roomId;
-      const qr = qrcode(0, 'M');
+      var baseUrl = window.location.href.split('?')[0];
+      var micUrl = baseUrl + '?room=' + roomId;
+      var qr = qrcode(0, 'M');
       qr.addData(micUrl);
       qr.make();
       document.getElementById('qr-container').innerHTML = qr.createSvgTag(6, 0);
 
-      // Create PeerJS peer and wait for connection
-      const peer = new Peer(peerId);
-      const render = createRenderer();
+      var peer = new Peer(peerId);
+      var render = createRenderer();
 
-      peer.on('open', () => {
+      peer.on('open', function() {
         document.getElementById('pair-status').textContent = 'Waiting for phone to connect...';
       });
 
-      peer.on('connection', (conn) => {
+      peer.on('connection', function(conn) {
         document.getElementById('pair-status').textContent = 'Phone connected!';
-        setTimeout(() => showScreen('visualizer'), 500);
+        setTimeout(function() { showScreen('visualizer'); }, 500);
 
-        conn.on('data', (data) => {
+        conn.on('data', function(data) {
           render(data.rawDb, data.freqBars);
         });
 
-        conn.on('close', () => {
+        conn.on('close', function() {
           showScreen('pair-screen');
           document.getElementById('pair-status').textContent = 'Phone disconnected. Waiting for reconnect...';
         });
       });
 
-      peer.on('error', (err) => {
+      peer.on('error', function(err) {
         document.getElementById('pair-status').textContent = 'Connection error: ' + err.type + '. Refresh to retry.';
       });
     }
 
-    tvBtn.addEventListener('click', startTvMode);
+    tvBtn.onclick = startTvMode;
 
-    // ── Mode 3: Phone Mic (auto-start if ?room= in URL) ──
-    async function startMicMode(roomId) {
+    // ── Mode 3: Phone Mic ──
+    function startMicMode(roomId) {
       showScreen('mic-screen');
-      const statusEl = document.getElementById('mic-status');
-      const infoEl = document.getElementById('mic-info');
-      const micDbEl = document.getElementById('mic-db');
+      var statusEl = document.getElementById('mic-status');
+      var infoEl = document.getElementById('mic-info');
+      var micDbEl = document.getElementById('mic-db');
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const sample = createAudioProcessor(stream);
+      var getUserMedia = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+        ? function(cb, err) { navigator.mediaDevices.getUserMedia({ audio: true }).then(cb, err); }
+        : function(cb, err) {
+            var gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+            if (!gum) { err(new Error('getUserMedia not supported')); return; }
+            gum.call(navigator, { audio: true }, cb, err);
+          };
+
+      getUserMedia(function(stream) {
+        var sample = createAudioProcessor(stream);
 
         statusEl.textContent = '🔄';
         infoEl.textContent = 'Connecting to display...';
 
-        const peer = new Peer();
-        peer.on('open', () => {
-          const peerId = 'soundspectrum-' + roomId;
-          const conn = peer.connect(peerId, { reliable: true });
+        var peer = new Peer();
+        peer.on('open', function() {
+          var peerId = 'soundspectrum-' + roomId;
+          var conn = peer.connect(peerId, { reliable: true });
 
-          conn.on('open', () => {
+          conn.on('open', function() {
             statusEl.textContent = '🎙️';
             infoEl.textContent = 'Streaming audio to display';
 
             function sendLoop() {
-              const data = sample();
+              var data = sample();
               conn.send(data);
-              // Show local dB on phone
               micDbEl.textContent = Math.round(data.rawDb) + ' dB';
 
               if (data.rawDb > 80) {
@@ -586,31 +617,30 @@
                 statusEl.textContent = '😴';
               }
 
-              setTimeout(sendLoop, 50); // ~20fps data rate
+              setTimeout(sendLoop, 50);
             }
             sendLoop();
           });
 
-          conn.on('close', () => {
+          conn.on('close', function() {
             statusEl.textContent = '❌';
             infoEl.textContent = 'Disconnected from display. Refresh to reconnect.';
           });
         });
 
-        peer.on('error', (err) => {
+        peer.on('error', function(err) {
           statusEl.textContent = '❌';
           infoEl.textContent = 'Connection failed: ' + err.type + '. Refresh to retry.';
         });
-      } catch (err) {
+      }, function(err) {
         statusEl.textContent = '❌';
         infoEl.textContent = 'Microphone access required: ' + err.message;
-      }
+      });
     }
 
     // ── Auto-detect mode from URL ──
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
-    const modeParam = urlParams.get('mode');
+    var roomParam = getUrlParam('room');
+    var modeParam = getUrlParam('mode');
     if (roomParam) {
       startMicMode(roomParam);
     } else if (modeParam === 'tv') {
