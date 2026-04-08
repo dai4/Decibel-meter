@@ -189,7 +189,7 @@
     <h1>Sound Spectrum</h1>
     <p>Visualize the colour of sound around you</p>
     <button class="btn" id="start-btn">Start Listening</button>
-    <button class="btn btn-secondary" id="tv-btn">Display on TV</button>
+    <button class="btn btn-secondary" id="tv-btn"><span id="tv-btn-text">Display on TV</span></button>
   </div>
 
   <!-- TV Pairing Screen -->
@@ -476,11 +476,33 @@
 
     // ── Mode 2: TV Display (receives data from phone) ──
     const tvBtn = document.getElementById('tv-btn');
+    const tvBtnText = document.getElementById('tv-btn-text');
+    const tvBtnLabel = 'Display on TV';
     let hoverTimer = null;
+    let countdownInterval = null;
+
+    // Lock button width on first render so countdown text doesn't resize it
+    tvBtn.style.minWidth = tvBtn.offsetWidth + 'px';
+
     tvBtn.addEventListener('mouseenter', () => {
-      hoverTimer = setTimeout(() => tvBtn.click(), 5000);
+      let seconds = 5;
+      tvBtnText.textContent = `${seconds}...`;
+      countdownInterval = setInterval(() => {
+        seconds--;
+        if (seconds > 0) {
+          tvBtnText.textContent = `${seconds}...`;
+        }
+      }, 1000);
+      hoverTimer = setTimeout(() => {
+        clearInterval(countdownInterval);
+        tvBtn.click();
+      }, 5000);
     });
-    tvBtn.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+    tvBtn.addEventListener('mouseleave', () => {
+      clearTimeout(hoverTimer);
+      clearInterval(countdownInterval);
+      tvBtnText.textContent = tvBtnLabel;
+    });
 
     tvBtn.addEventListener('click', () => {
       const roomId = generateRoomId();
