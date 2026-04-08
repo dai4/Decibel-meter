@@ -366,12 +366,15 @@
       const DISPLAY_SMOOTH = 0.08;
       const DISPLAY_SPIKE = 0.35;
 
-      // Adaptive threshold: track ambient noise level
-      let ambientDb = -1;           // -1 = not yet calibrated
-      let ambientSamples = 0;       // count frames for learning curve
+      // Adaptive threshold: continuously track ambient noise
+      let ambientDb = -1;
+      let ambientFrames = 0;
+      const AMBIENT_FAST = 0.15;    // initial calibration rate
+      const AMBIENT_STEADY = 0.01;  // ongoing tracking rate
+      const CALIBRATION = 120;      // ~2s at 60fps before switching to steady
       const SPIKE_MARGIN = 12;      // dB above ambient to trigger alert
-      const MIN_THRESHOLD = 45;     // never trigger below this
-      let isAlerting = false;       // true when over threshold
+      const MIN_THRESHOLD = 45;
+      let isAlerting = false;
 
       function update() {
         analyser.getByteTimeDomainData(dataArray);
@@ -410,14 +413,18 @@
           clearTimeout(peakDecayTimer);
           peakDecayTimer = setTimeout(() => { peakDb = 0; }, 3000);
         }
-        // Adapt ambient baseline with learning curve:
-        // Fast at first (learns room in ~2s), then slows to track drift
-        ambientSamples++;
-        const adaptRate = Math.max(0.003, 0.3 / Math.sqrt(ambientSamples));
+        // Continuously adapt ambient baseline
+        ambientFrames++;
+        const adaptRate = ambientFrames < CALIBRATION ? AMBIENT_FAST : AMBIENT_STEADY;
         if (ambientDb < 0) {
           ambientDb = rawDb;
         } else if (rawDb < ambientDb + SPIKE_MARGIN) {
+          // Track both rises and drops in room noise
           ambientDb += (rawDb - ambientDb) * adaptRate;
+        } else {
+          // During spikes, still let ambient drift down slowly
+          // so it adjusts if the room gets quieter
+          ambientDb += (rawDb - ambientDb) * 0.001;
         }
         const threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
 
