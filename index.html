@@ -491,14 +491,8 @@
 
         var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
 
-        // Detect HIGH PITCH + LOUD = shriek (must sustain for 5+ frames)
-        var isHighAndLoud = (pitch === 3) && (rawDb > threshold + 5);
-        if (isHighAndLoud) {
-          shriekFrames++;
-        } else {
-          shriekFrames = Math.max(0, shriekFrames - 2); // decay slowly
-        }
-        var isShriek = shriekFrames >= SHRIEK_CONFIRM;
+        // Detect shriek: simply above 70dB
+        var isShriek = rawDb > 70;
         if (shriekCooldown > 0) shriekCooldown--;
 
         if (isShriek && shriekCooldown === 0) {
