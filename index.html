@@ -261,7 +261,7 @@
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.25);
@@ -323,7 +323,7 @@
         peakDbEl.textContent = `Peak: ${peakDb} dB`;
 
         // Alert on loud sounds
-        if (rawDb > 80) playAlert();
+        if (rawDb > 75) playAlert();
 
         // Get color
         const { color, label: dbLabel } = getColorForDb(db);
