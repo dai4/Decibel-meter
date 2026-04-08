@@ -475,7 +475,14 @@
     });
 
     // ── Mode 2: TV Display (receives data from phone) ──
-    document.getElementById('tv-btn').addEventListener('click', () => {
+    const tvBtn = document.getElementById('tv-btn');
+    let hoverTimer = null;
+    tvBtn.addEventListener('mouseenter', () => {
+      hoverTimer = setTimeout(() => tvBtn.click(), 5000);
+    });
+    tvBtn.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+
+    tvBtn.addEventListener('click', () => {
       const roomId = generateRoomId();
       const peerId = 'soundspectrum-' + roomId;
 
