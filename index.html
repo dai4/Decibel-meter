@@ -565,13 +565,6 @@
 
           peakDbEl.textContent = Math.round(ambientDb) + ' dB ambient \u00B7 Threshold: ' + Math.round(threshold) + ' dB';
 
-          // Show shriek counter
-          if (shriekCount > 0) {
-            voicesEl.innerHTML = '<span class="voice-tag" style="border-color:' +
-              rgbStr([255, 80, 80], 0.5) + '">' +
-              '\uD83D\uDE31 High-pitch shrieks: ' + shriekCount + '</span>';
-          }
-
           var intensity = Math.min(db / 100, 1);
           var ringScale = 1 + intensity * 0.1;
           spectrumRing.style.webkitTransform = 'scale(' + ringScale + ')';
