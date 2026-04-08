@@ -167,18 +167,13 @@
       margin: 0 1px;
     }
 
-    #scale {
+    #db-chart {
       position: absolute;
-      bottom: 130px;
+      bottom: 125px;
       left: 0;
       width: 100%;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      padding: 0 20px;
-      font-size: 0.7rem;
-      color: #666;
+      height: 120px;
+      z-index: 1;
     }
 
     #bg-glow {
@@ -201,7 +196,7 @@
 
     #voices {
       position: absolute;
-      bottom: 140px;
+      bottom: 252px;
       left: 0;
       width: 100%;
       display: -webkit-flex;
@@ -262,12 +257,7 @@
     <div id="peak-db"></div>
     <div id="voices"></div>
     <div id="spectrum-bar"></div>
-    <div id="scale">
-      <span>Quiet</span>
-      <span>Moderate</span>
-      <span>Loud</span>
-      <span>Very Loud</span>
-    </div>
+    <canvas id="db-chart"></canvas>
   </div>
 
   <script>
@@ -464,6 +454,13 @@
       var frameCount = 0;
       var lastDisplayUpdate = 0;
 
+      // Line chart state
+      var chartHistory = [];
+      var CHART_LEN = 150;
+      var chartCanvas = document.getElementById('db-chart');
+      var chartCtx = chartCanvas ? chartCanvas.getContext('2d') : null;
+      var chartSized = false;
+
       return function render(rawDb, freqBars, pitch) {
         frameCount++;
 
@@ -597,6 +594,133 @@
             bars[i].style.height = barHeight + 'px';
             bars[i].style.background = rgbStr(barColor, 0.6 + value * 0.4);
           }
+        }
+
+        // ── dB line chart ──
+        if (frameCount % 2 === 0) {
+          chartHistory.push(rawDb);
+          if (chartHistory.length > CHART_LEN) chartHistory.shift();
+        }
+
+        if (chartCtx && chartHistory.length > 1 && frameCount % 2 === 0) {
+          var cw = chartCanvas.offsetWidth;
+          var ch = chartCanvas.offsetHeight;
+          if (!chartSized || chartCanvas.width !== cw || chartCanvas.height !== ch) {
+            chartCanvas.width = cw;
+            chartCanvas.height = ch;
+            chartSized = true;
+          }
+          var W = chartCanvas.width;
+          var H = chartCanvas.height;
+          var pX = 20, pY = 8;
+          var dW = W - pX * 2;
+          var dH = H - pY * 2;
+          var dbLo = 25, dbHi = 95, dbR = dbHi - dbLo;
+          var tDb = 70; // threshold dB
+          var cLen = chartHistory.length;
+          var cStep = dW / (CHART_LEN - 1);
+          var bX = pX + dW - (cLen - 1) * cStep;
+
+          chartCtx.clearRect(0, 0, W, H);
+
+          // Threshold line
+          var tY = pY + dH * (1 - (tDb - dbLo) / dbR);
+          chartCtx.strokeStyle = 'rgba(255, 80, 80, 0.15)';
+          chartCtx.lineWidth = 1;
+          chartCtx.beginPath();
+          chartCtx.moveTo(pX, tY);
+          chartCtx.lineTo(pX + dW, tY);
+          chartCtx.stroke();
+
+          // Helper to get y for a dB value
+          var ci, cx0, cy0, cdb;
+
+          // Fill above-threshold spikes with subtle red
+          chartCtx.fillStyle = 'rgba(255, 40, 40, 0.1)';
+          for (ci = 1; ci < cLen; ci++) {
+            var cdb0 = chartHistory[ci - 1];
+            var cdb1 = chartHistory[ci];
+            if (cdb1 > tDb || cdb0 > tDb) {
+              var fx0 = bX + (ci - 1) * cStep;
+              var fx1 = bX + ci * cStep;
+              var fy0 = pY + dH * (1 - (Math.max(dbLo, Math.min(dbHi, cdb0)) - dbLo) / dbR);
+              var fy1 = pY + dH * (1 - (Math.max(dbLo, Math.min(dbHi, cdb1)) - dbLo) / dbR);
+              chartCtx.beginPath();
+              chartCtx.moveTo(fx0, Math.min(fy0, tY));
+              chartCtx.lineTo(fx1, Math.min(fy1, tY));
+              chartCtx.lineTo(fx1, tY);
+              chartCtx.lineTo(fx0, tY);
+              chartCtx.closePath();
+              chartCtx.fill();
+            }
+          }
+
+          // Base line (teal, faint)
+          chartCtx.beginPath();
+          chartCtx.strokeStyle = 'rgba(0, 200, 140, 0.3)';
+          chartCtx.lineWidth = 1.5;
+          chartCtx.lineJoin = 'round';
+          chartCtx.lineCap = 'round';
+          for (ci = 0; ci < cLen; ci++) {
+            cx0 = bX + ci * cStep;
+            cy0 = pY + dH * (1 - (Math.max(dbLo, Math.min(dbHi, chartHistory[ci])) - dbLo) / dbR);
+            if (ci === 0) chartCtx.moveTo(cx0, cy0);
+            else chartCtx.lineTo(cx0, cy0);
+          }
+          chartCtx.stroke();
+
+          // Red overlay for above-threshold segments
+          chartCtx.strokeStyle = 'rgba(255, 60, 60, 0.85)';
+          chartCtx.lineWidth = 2;
+          var inSpike = false;
+          for (ci = 0; ci < cLen; ci++) {
+            cdb = chartHistory[ci];
+            cx0 = bX + ci * cStep;
+            cy0 = pY + dH * (1 - (Math.max(dbLo, Math.min(dbHi, cdb)) - dbLo) / dbR);
+            if (cdb > tDb) {
+              if (!inSpike) {
+                chartCtx.beginPath();
+                if (ci > 0) {
+                  var px = bX + (ci - 1) * cStep;
+                  var py = pY + dH * (1 - (Math.max(dbLo, Math.min(dbHi, chartHistory[ci - 1])) - dbLo) / dbR);
+                  chartCtx.moveTo(px, py);
+                }
+                inSpike = true;
+              }
+              chartCtx.lineTo(cx0, cy0);
+            } else if (inSpike) {
+              chartCtx.lineTo(cx0, cy0);
+              chartCtx.stroke();
+              inSpike = false;
+            }
+          }
+          if (inSpike) chartCtx.stroke();
+
+          // Glowing laser point at the right end
+          var lx = bX + (cLen - 1) * cStep;
+          var ldb = chartHistory[cLen - 1];
+          var ly = pY + dH * (1 - (Math.max(dbLo, Math.min(dbHi, ldb)) - dbLo) / dbR);
+          var isAbove = ldb > tDb;
+          var gR = isAbove ? 255 : 0;
+          var gG = isAbove ? 60 : 220;
+          var gB = isAbove ? 60 : 150;
+
+          // Outer glow
+          chartCtx.save();
+          chartCtx.shadowColor = 'rgba(' + gR + ',' + gG + ',' + gB + ',0.9)';
+          chartCtx.shadowBlur = 20;
+          chartCtx.fillStyle = 'rgba(' + gR + ',' + gG + ',' + gB + ',0.6)';
+          chartCtx.beginPath();
+          chartCtx.arc(lx, ly, 3.5, 0, Math.PI * 2);
+          chartCtx.fill();
+          chartCtx.fill();
+          chartCtx.restore();
+
+          // Bright center
+          chartCtx.fillStyle = 'rgba(' + gR + ',' + gG + ',' + gB + ',1)';
+          chartCtx.beginPath();
+          chartCtx.arc(lx, ly, 2, 0, Math.PI * 2);
+          chartCtx.fill();
         }
       };
     }
