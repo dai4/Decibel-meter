@@ -616,6 +616,18 @@
 
           chartCtx.clearRect(0, 0, W, H);
 
+          // Left-hand dB scale
+          chartCtx.font = '9px sans-serif';
+          chartCtx.fillStyle = 'rgba(255,255,255,0.25)';
+          chartCtx.textAlign = 'left';
+          chartCtx.textBaseline = 'middle';
+          var scaleVals = [30, 50, 70, 90];
+          for (var si = 0; si < scaleVals.length; si++) {
+            var sVal = scaleVals[si];
+            var sY = pY + dH * (1 - (sVal - dbLo) / dbR);
+            chartCtx.fillText(sVal + '', 2, sY);
+          }
+
           // Threshold line
           var tY = pY + dH * (1 - (tDb - dbLo) / dbR);
           chartCtx.strokeStyle = 'rgba(255, 80, 80, 0.15)';
