@@ -251,6 +251,24 @@
       analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
 
+      // Alert tone when dB exceeds 80
+      let alertReady = true;
+      function playAlert() {
+        if (!alertReady) return;
+        alertReady = false;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+        // Cooldown so it doesn't spam
+        setTimeout(() => { alertReady = true; }, 2000);
+      }
+
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       const freqArray = new Uint8Array(bufferLength);
@@ -303,6 +321,9 @@
           peakDecayTimer = setTimeout(() => { peakDb = 0; }, 3000);
         }
         peakDbEl.textContent = `Peak: ${peakDb} dB`;
+
+        // Alert on loud sounds
+        if (rawDb > 80) playAlert();
 
         // Get color
         const { color, label: dbLabel } = getColorForDb(db);
