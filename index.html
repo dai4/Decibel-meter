@@ -489,10 +489,10 @@
           ambientDb = rawDb;
         }
 
-        var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
+        var threshold = userThreshold;
 
-        // Detect shriek: simply above 70dB
-        var isShriek = rawDb > userThreshold;
+        // Detect shriek: above user threshold
+        var isShriek = rawDb > threshold;
         if (shriekCooldown > 0) shriekCooldown--;
 
         if (isShriek && shriekCooldown === 0) {
@@ -504,7 +504,7 @@
         var newState;
         if (isShriek || (lastState === 'shriek' && stateHoldFrames > 0)) {
           newState = 'shriek';
-        } else if (rawDb > threshold) {
+        } else if (rawDb > threshold - 10) {
           newState = 'loud';
         } else {
           newState = 'calm';
