@@ -151,6 +151,33 @@
       z-index: 1;
     }
 
+    #threshold-ctrl {
+      z-index: 2;
+      margin-top: 0.5rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.4);
+    }
+    #threshold-ctrl label { display: block; margin-bottom: 0.2rem; }
+    #thresh-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 160px;
+      height: 4px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+      outline: none;
+    }
+    #thresh-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.6);
+      cursor: pointer;
+    }
+
     #bg-glow {
       position: fixed;
       top: 0; left: 0;
@@ -230,6 +257,10 @@
     </div>
     <div id="label">Waiting...</div>
     <div id="peak-db"></div>
+    <div id="threshold-ctrl">
+      <label for="thresh-slider">Threshold: <span id="thresh-val">70</span> dB</label>
+      <input type="range" id="thresh-slider" min="40" max="100" value="70" step="1">
+    </div>
     <div id="voices"></div>
     <canvas id="db-chart"></canvas>
   </div>
@@ -417,6 +448,15 @@
       var chartCanvas = document.getElementById('db-chart');
       var chartCtx = chartCanvas ? chartCanvas.getContext('2d') : null;
       var chartSized = false;
+      var threshSlider = document.getElementById('thresh-slider');
+      var threshValEl = document.getElementById('thresh-val');
+      var userThreshold = 70;
+      if (threshSlider) {
+        threshSlider.oninput = function() {
+          userThreshold = parseInt(threshSlider.value, 10);
+          threshValEl.textContent = userThreshold;
+        };
+      }
 
       return function render(rawDb, freqBars, pitch) {
         frameCount++;
@@ -446,7 +486,7 @@
         var threshold = Math.max(MIN_THRESHOLD, ambientDb + SPIKE_MARGIN);
 
         // Detect shriek: simply above 70dB
-        var isShriek = rawDb > 70;
+        var isShriek = rawDb > userThreshold;
         if (shriekCooldown > 0) shriekCooldown--;
 
         if (isShriek && shriekCooldown === 0) {
@@ -554,7 +594,7 @@
           var dW = W - pX * 2;
           var dH = H - pY * 2;
           var dbLo = 25, dbHi = 95, dbR = dbHi - dbLo;
-          var tDb = 70; // threshold dB
+          var tDb = userThreshold;
           var cLen = chartHistory.length;
           var cStep = dW / (CHART_LEN - 1);
           var bX = pX + dW - (cLen - 1) * cStep;
