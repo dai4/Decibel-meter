@@ -264,8 +264,8 @@
     <div id="label">Waiting...</div>
     <div id="peak-db"></div>
     <div id="threshold-ctrl">
-      <label for="thresh-slider">Threshold: <span id="thresh-val">70</span> dB</label>
-      <input type="range" id="thresh-slider" min="40" max="100" value="70" step="1">
+      <label for="thresh-slider">Threshold: <span id="thresh-val">85</span> dB</label>
+      <input type="range" id="thresh-slider" min="40" max="100" value="85" step="1">
     </div>
     <div id="voices"></div>
     <canvas id="db-chart"></canvas>
@@ -456,7 +456,7 @@
       var chartSized = false;
       var threshSlider = document.getElementById('thresh-slider');
       var threshValEl = document.getElementById('thresh-val');
-      var userThreshold = 70;
+      var userThreshold = 85;
       if (threshSlider) {
         threshSlider.oninput = function() {
           userThreshold = parseInt(threshSlider.value, 10);
